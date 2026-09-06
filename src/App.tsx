@@ -306,11 +306,15 @@ export default function App() {
   };
 
   const handleAddResource = (title: string, content: string) => {
-    setResources([...resources, { id: crypto.randomUUID(), title, content, createdAt: Date.now() }]);
+    const cleanedTitle = title.trim();
+    if (!cleanedTitle) return;
+    setResources(prev => [...prev, { id: crypto.randomUUID(), title: cleanedTitle, content, createdAt: Date.now() }]);
   };
 
   const handleUpdateResource = (id: string, title: string, content: string) => {
-    setResources(resources.map(r => r.id === id ? { ...r, title, content } : r));
+    const cleanedTitle = title.trim();
+    if (!cleanedTitle) return;
+    setResources(prev => prev.map(r => r.id === id ? { ...r, title: cleanedTitle, content } : r));
   };
 
   const handleRemoveResource = (id: string) => {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, BookOpen, Trash2, Plus, Sparkles, Pencil, Upload, Loader2, Settings, ShieldAlert, X, GitMerge, FileText } from 'lucide-react';
 import { AppSettings, SavedResource, ScheduleData } from '../types';
@@ -69,10 +69,10 @@ export function Dashboard({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const formatForInput = (d: Date) => {
+  const formatForInput = useCallback((d: Date) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
     return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  };
+  }, []);
 
   useEffect(() => {
     if (onResourceEditStateChange) {
@@ -81,27 +81,37 @@ export function Dashboard({
   }, [editingResource, onResourceEditStateChange]);
 
 
-  const openNewResource = () => {
+  const closeResourceEditor = useCallback(() => {
+    setNavDirection('backward');
+    setEditingResource(null);
+    setIsConfirmingDelete(false);
+  }, []);
+
+  const openNewResource = useCallback(() => {
     setNavDirection('forward');
     setEditingResource('new');
     setNewResTitle('');
     setNewResContent('');
-  };
+  }, []);
 
-  const openEditResource = (res: SavedResource) => {
+  const openEditResource = useCallback((res: SavedResource) => {
     setNavDirection('forward');
     setEditingResource(res);
     setNewResTitle(res.title);
     setNewResContent(res.content);
-  };
+  }, []);
 
   
-  const handleSaveAndCleanup = async (e: React.FormEvent) => {
+  const handleSaveAndCleanup = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newResTitle.trim() && !newResContent.trim()) return;
+    const trimmedTitle = newResTitle.trim();
+    const trimmedContent = newResContent.trim();
+    if (!trimmedTitle && !trimmedContent) {
+      return;
+    }
 
     setIsDecluttering(true);
-    let finalTitle = newResTitle;
+    let finalTitle = trimmedTitle;
     let finalContent = newResContent;
 
     try {
@@ -109,23 +119,28 @@ export function Dashboard({
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         headers['x-api-key'] = settings.apiKey;
         if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
-      if (settings.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
-      if (settings.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
-      if (settings.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
-      headers['x-ocr-type'] = ocrType;
+        if (settings.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
+        if (settings.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
+        if (settings.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
+        headers['x-ocr-type'] = ocrType;
 
         const res = await fetch('/api/declutter-resource', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ title: newResTitle, content: newResContent })
+          body: JSON.stringify({ title: trimmedTitle, content: trimmedContent })
         });
-        
-        const data = await res.json();
-        if (res.ok && !data.error) {
-          if (!newResTitle.trim() && data.title) finalTitle = data.title;
-          if (data.content) finalContent = data.content;
-        } else {
-          console.error("Declutter AI error", data.error);
+
+        const contentType = res.headers.get('content-type') || '';
+        const rawText = contentType.includes('application/json') ? await res.text() : '';
+        const data = contentType.includes('application/json') ? JSON.parse(rawText || '{}') : null;
+
+        if (res.ok && data && !data.error) {
+          if (typeof data.title === 'string' && data.title.trim()) finalTitle = data.title.trim();
+          if (typeof data.content === 'string' && data.content.trim()) finalContent = data.content;
+        } else if (res.status === 404 || res.status === 500) {
+          console.warn('Declutter service unavailable; preserving the entered title.');
+        } else if (data?.error) {
+          console.error('Declutter AI error', data.error);
         }
       }
     } catch (err: any) {
@@ -134,85 +149,99 @@ export function Dashboard({
       setIsDecluttering(false);
     }
 
-    if (editingResource === 'new') {
-      onAddResource(finalTitle || 'Untitled Resource', finalContent);
-    } else if (editingResource) {
-      onUpdateResource(editingResource.id, finalTitle || 'Untitled Resource', finalContent);
+    const baseTitle = finalTitle.trim();
+    const preservedTitle = baseTitle || (editingResource && editingResource !== 'new' ? editingResource.title.trim() : '');
+    if (!preservedTitle) {
+      showError('A proper resource title is required before saving. Please add one or try a document upload that generates a title.');
+      return;
     }
-    { setNavDirection('backward'); setEditingResource(null); };
-  };
+
+    if (editingResource === 'new') {
+      onAddResource(preservedTitle, finalContent);
+    } else if (editingResource) {
+      onUpdateResource(editingResource.id, preservedTitle, finalContent);
+    }
+
+    closeResourceEditor();
+  }, [closeResourceEditor, editingResource, newResContent, newResTitle, ocrType, onAddResource, onUpdateResource, settings.apiKey, settings.apiModel, settings.formattedOcrKey, settings.prompts, settings.simpleOcrKey, showError]);
 
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsParsing(true);
     const formData = new FormData();
     formData.append('document', file);
-    formData.append('type', 'homework'); // Skip AI parsing for raw OCR
+    formData.append('type', 'homework');
 
     try {
       const headers: Record<string, string> = {};
       if (settings.apiKey) headers['x-api-key'] = settings.apiKey;
       if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
       if (settings.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
-
       if (settings.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
       if (settings.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
       headers['x-ocr-type'] = ocrType;
-      const res = await fetch('/api/parse-resource', { 
-        method: 'POST', 
+
+      const res = await fetch('/api/parse-resource', {
+        method: 'POST',
         headers,
-        body: formData 
+        body: formData
       });
-      
+
       let data;
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
         data = await res.json();
       } else {
         const text = await res.text();
         if (res.status === 413) {
-           throw new Error('File is too large. Please upload a smaller file (under 30MB).');
+          throw new Error('File is too large. Please upload a smaller file (under 30MB).');
         }
-        throw new Error(`Server returned unexpected response (${res.status}): ${text.substring(0, 50)}...`);
+        if (res.status === 404) {
+          throw new Error('The resource parser is unavailable right now. Please restart the app and try again.');
+        }
+        throw new Error(text ? text.substring(0, 120) : `Server returned unexpected response (${res.status}).`);
       }
-      
+
       if (!res.ok || data.error) {
         if (res.status === 401 || (data.error && typeof data.error === 'string' && data.error.includes('UNAUTHENTICATED'))) {
           throw new Error('Invalid API Key. Please update your API key in the Dashboard Settings.');
         }
+        if (res.status === 404) {
+          throw new Error('The resource parser is unavailable right now. Please restart the app and try again.');
+        }
         throw new Error(data.error || res.statusText);
       }
-      
+
       setNewResContent(data.content);
-      // Leave title empty as requested
     } catch (err: any) {
       showError(`Failed to parse document: ${err.message}`);
     } finally {
       setIsParsing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  };
+  }, [ocrType, settings.apiKey, settings.apiModel, settings.formattedOcrKey, settings.prompts, settings.simpleOcrKey, showError]);
 
-  const formatTimeLeft = (seconds: number | null) => {
+  const formatTimeLeft = useCallback((seconds: number | null) => {
     if (seconds === null) return '--:--:--';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  const format12Hour = (time24: string) => {
+  const format12Hour = useCallback((time24: string) => {
     const [h, m] = time24.split(':').map(Number);
     const ampm = h >= 12 ? 'PM' : 'AM';
     const h12 = h % 12 || 12;
     return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
-  };
+  }, []);
 
-  const schedules = settings.schedules || [];
-  const activeSchedules = schedules.filter(s => s.isActive);
+  const schedules = useMemo(() => settings.schedules || [], [settings.schedules]);
+  const activeSchedules = useMemo(() => schedules.filter(s => s.isActive), [schedules]);
+  const canCreateSchedule = Boolean(settings.apiKey && (settings.simpleOcrKey || settings.formattedOcrKey));
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -329,10 +358,7 @@ export function Dashboard({
             <div className="flex space-x-4">
               <button 
                 type="button" 
-                onClick={() => {
-                  { setNavDirection('backward'); setEditingResource(null); };
-                  setIsConfirmingDelete(false);
-                }}
+                onClick={closeResourceEditor}
                 className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors"
               >
                 Cancel
@@ -380,7 +406,7 @@ export function Dashboard({
                         onClick={() => {
                           onCombineResources(mergingResource.id, r.id);
                           setMergingResource(null);
-                          { setNavDirection('backward'); setEditingResource(null); }; // Close the edit window too as they merged
+                          closeResourceEditor();
                         }}
                         className="p-4 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-xl flex flex-col text-left transition-colors"
                       >
@@ -418,8 +444,7 @@ export function Dashboard({
                   type="button"
                   onClick={() => {
                     onRemoveResource(editingResource.id);
-                    { setNavDirection('backward'); setEditingResource(null); };
-                    setIsConfirmingDelete(false);
+                    closeResourceEditor();
                   }}
                   className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors"
                 >
@@ -507,12 +532,10 @@ export function Dashboard({
             </div>
           )}
           <button
-            disabled={!settings.apiKey || (!settings.simpleOcrKey && !settings.formattedOcrKey)}
-            onClick={() => {
-              onCreateSchedule();
-            }}
+            disabled={!canCreateSchedule}
+            onClick={onCreateSchedule}
             className={`px-6 py-3 font-bold rounded-xl shadow-lg transition-all flex items-center ${
-              (settings.apiKey && (settings.simpleOcrKey || settings.formattedOcrKey))
+              canCreateSchedule
                 ? 'bg-red-600 hover:bg-red-700 text-white' 
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}

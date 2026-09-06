@@ -10,20 +10,22 @@ import { getPrompt } from './promptUtils.js';
 // Setup file upload handling in memory
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB limit
 
-const getApiKey = (req: express.Request): string | undefined => {
-  const customKey = req.headers['x-api-key'];
-  if (Array.isArray(customKey)) {
-    return customKey[0] || process.env.GEMINI_API_KEY;
+const getHeaderString = (req: express.Request, key: string): string => {
+  const value = req.headers[key];
+  if (Array.isArray(value)) {
+    return value[0] || '';
   }
-  return typeof customKey === 'string' ? customKey : process.env.GEMINI_API_KEY;
+  return typeof value === 'string' ? value : '';
+};
+
+const getApiKey = (req: express.Request): string | undefined => {
+  const customKey = getHeaderString(req, 'x-api-key');
+  return customKey || process.env.GEMINI_API_KEY;
 };
 
 const getApiModel = (req: express.Request): string => {
-  const customModel = req.headers['x-api-model'];
-  if (Array.isArray(customModel)) {
-    return customModel[0] || 'gemini-3.7-flash';
-  }
-  return typeof customModel === 'string' ? customModel : 'gemini-3.7-flash';
+  const customModel = getHeaderString(req, 'x-api-model');
+  return customModel || 'gemini-3.7-flash';
 };
 
 const getGeminiClient = (req: express.Request) => {
@@ -38,6 +40,9 @@ const parseJsonResponse = (textOutput: string | undefined) => {
   const cleaned = textOutput?.replace(/```json/g, '').replace(/```/g, '').trim() || '{}';
   return JSON.parse(cleaned);
 };
+
+const wordSegmenter = new Intl.Segmenter('en', { granularity: 'word' });
+const sentenceSegmenter = new Intl.Segmenter('en', { granularity: 'sentence' });
 
 async function startServer() {
   
@@ -97,11 +102,11 @@ const app = express();
         return res.status(500).json({ error: 'Server missing GEMINI_API_KEY and no custom key provided' });
       }
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
       const mimeType = file.mimetype;
       const isDocx = mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.originalname.endsWith('.docx');
-      
-      let parts: any[] = [];
+
+      const parts: Array<{ text: string }> = [];
       
       if (isDocx) {
         const result = await mammoth.extractRawText({ buffer: file.buffer });
@@ -171,7 +176,7 @@ const app = express();
       const apiKey = getApiKey(req);
       if (!apiKey) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
 
       const response = await ai.models.generateContent({
         model: apiModel,
@@ -197,7 +202,7 @@ const app = express();
       const apiKey = getApiKey(req);
       if (!apiKey) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
 
       const prompt = getPrompt(req, 'declutterResource', { TITLE: title || 'None', CONTENT: content });
 
@@ -235,13 +240,13 @@ const app = express();
       const apiKey = getApiKey(req);
       if (!apiKey) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
 
       const rubricSection = rubric ? `\n=== GRADING RUBRIC (MUST FOLLOW EXACTLY) ===\n${rubric}\n============================================\n` : '';
       const prompt = getPrompt(req, 'generateAnswer', { CONTENT: content, RUBRIC_SECTION: rubricSection, RESOURCES_TEXT: resourcesText });
 
       const response = await ai.models.generateContent({
-        model: apiModel as string,
+        model: apiModel,
         contents: prompt,
       });
 
@@ -263,7 +268,7 @@ const app = express();
       const apiKey = getApiKey(req);
       if (!apiKey) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
 
       const prompt = getPrompt(req, 'checkSimilarity', { NEW_HOMEWORK: newHomework, EXISTING_HOMEWORKS: existingHomeworks.map((hw, i) => `${i+1}. ${hw}`).join('\n') });
 
@@ -304,7 +309,7 @@ const app = express();
       const apiKey = getApiKey(req);
       if (!apiKey) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
 
       const prompt = getPrompt(req, 'validateHomework', { CONTENT: content, RESOURCES_TEXT: resourcesText });
 
@@ -343,7 +348,7 @@ const app = express();
       const apiKey = getApiKey(req);
       if (!apiKey) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
 
       const prompt = getPrompt(req, 'refineRubricWithContext', { BASE_RUBRIC: baseRubric, RESOURCES_TEXT: resourcesText || '', CONTENT: content || '' });
 
@@ -368,7 +373,7 @@ const app = express();
       const apiKey = getApiKey(req);
       if (!apiKey) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY and no custom key provided' });
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
 
       const prompt = getPrompt(req, 'generateRubricWithContext', { RESOURCES_TEXT: resourcesText || '', CONTENT: content });
 
@@ -395,7 +400,7 @@ const app = express();
       const apiKey = getApiKey(req);
       if (!apiKey) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
 
       const prompt = getPrompt(req, 'correctText', { TEXT: text });
 
@@ -433,7 +438,7 @@ const app = express();
         return res.status(500).json({ error: 'Server missing GEMINI_API_KEY and no custom key provided' });
       }
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
 
       // Check if user already provided edited text
       const userTranscribedText = req.body.transcribedText;
@@ -458,10 +463,7 @@ const app = express();
         // We replace all newlines with spaces purely for counting purposes to get an accurate linguistic count.
         const textForCounting = finalExtractedText.replace(/\n+/g, ' ');
 
-        const wordSegmenter = new Intl.Segmenter('en', { granularity: 'word' });
         wordCount = Array.from(wordSegmenter.segment(textForCounting)).filter(s => s.isWordLike).length;
-           
-        const sentenceSegmenter = new Intl.Segmenter('en', { granularity: 'sentence' });
         sentenceCount = Array.from(sentenceSegmenter.segment(textForCounting)).filter(s => s.segment.trim().length > 0).length;
 
         imagePart = { text: `[Extracted Homework Answer via ${ocrType} OCR]:\n${finalExtractedText}\n\n[System Metrics]:\n- Word Count: ${wordCount}\n- Sentence Count: ${sentenceCount}` };
@@ -537,7 +539,7 @@ Output ONLY JSON:
       const apiKey = getApiKey(req);
       if (!apiKey) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = getGeminiClient(req);
       const refinePrompt = `Review this system prompt. If it has structural weaknesses, typos, or contradictions, gently refine it. 
 CRITICAL RULE: DO NOT change any template variables like {{CONTENT}} or {{TITLE}}. Leave them EXACTLY as they are.
 CRITICAL RULE: Keep it extremely direct and plain-spoken. Do not add conversational fluff.
@@ -585,13 +587,6 @@ ${promptText}`;
     });
   }
 
-  // Global error handler
-  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error('Server error:', err);
-    res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-  });
-
-  
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
