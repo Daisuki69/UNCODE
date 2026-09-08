@@ -1,37 +1,24 @@
 const fs = require('fs');
 let code = fs.readFileSync('server.ts', 'utf8');
 
-// Step 1: Add finalExtractedText and replace extractedText inside the block
-code = code.replace(
-  /let sentenceCount = 0;\s*if \(mimeType\.startsWith\('image\/'\)\) \{/,
-  `let sentenceCount = 0;\n      let finalExtractedText = '';\n\n      if (mimeType.startsWith('image/')) {`
-);
+const replacement = `
+      const docType = req.body.type || 'resource';
+      
+      if (docType === 'transcription') {
+        let rawText = '';
+        if (isDocx) {
+          rawText = parts[0].text;
+        } else if (mimeType.startsWith('text/')) {
+          rawText = parts[0].text;
+        } else if (mimeType.startsWith('image/')) {
+           rawText = parts[0].text.split(']:\\n')[1] || parts[0].text;
+        }
+        return res.json({ content: rawText, title: file.originalname });
+      }
 
-code = code.replace(
-  /const extractedText = userTranscribedText \n          \? userTranscribedText \n          : await extractTextFromImage\(file\.buffer, mimeType, ocrType, simpleKey, formattedKey\);/,
-  `finalExtractedText = userTranscribedText \n          ? userTranscribedText \n          : await extractTextFromImage(file.buffer, mimeType, ocrType, simpleKey, formattedKey);`
-);
+      const promptKey = docType === 'homework' ? 'parseHomework' : 'parseResource';
+`;
 
-code = code.replace(
-  /const textForCounting = extractedText\.replace\(\/\\n\+\/g, ' '\);/,
-  `const textForCounting = finalExtractedText.replace(/\\n+/g, ' ');`
-);
-
-code = code.replace(
-  /\$\{extractedText\}/g,
-  `\${finalExtractedText}`
-);
-
-// Step 2: Remove transcribedText from prompt JSON structure
-code = code.replace(
-  /"transcribedText": "Quick transcription of the image"/,
-  `// "transcribedText": "No longer needed, server handles it"`
-);
-
-// Step 3: Explicitly set result.transcribedText
-code = code.replace(
-  /result\.sentenceCount = sentenceCount;\n\s*\}/,
-  `result.sentenceCount = sentenceCount;\n        }\n        result.transcribedText = finalExtractedText;`
-);
+code = code.replace(/const docType = req\.body\.type \|\| 'resource';\n\s*const promptKey = docType === 'homework' \? 'parseHomework' : 'parseResource';/, replacement.trim());
 
 fs.writeFileSync('server.ts', code);

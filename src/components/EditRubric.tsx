@@ -32,14 +32,20 @@ export function EditRubric({ schedule, resources, apiKey, apiModel, role, onSave
       // but for this simple version we'll just send all of them if that's what was provided,
       // or we can prompt to select. For simplicity, we just use all resources, as the API limits might hit.
       // Wait, let's just send all resources to keep it simple, or maybe none if it was empty.
-      const resourcesText = resources.map(r => `=== ${r.title} ===\n${r.content}`).join('\n\n');
+      const resourcesText = resources.filter(r => schedule.selectedResourceIds.includes(r.id)).map(r => `=== ${r.title} ===\n${r.content}`).join('\n\n');
       
-      const res = await fetch('/api/generate-rubric', {
+      const res = await fetch('/api/build-rubric', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ content: schedule.homeworkContent, role, resourcesText })
+        body: JSON.stringify({ content: schedule.homeworkContent, resourcesText, userDraft: "None" })
       });
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 100)}`);
+      }
       if (!res.ok || data.error) {
         if (res.status === 401 || (data.error && typeof data.error === 'string' && data.error.includes('UNAUTHENTICATED'))) {
           throw new Error('Invalid API Key. Please update your API key in the Dashboard Settings.');
@@ -68,17 +74,23 @@ export function EditRubric({ schedule, resources, apiKey, apiModel, role, onSave
       
       const resourcesText = resources.filter(r => schedule.selectedResourceIds.includes(r.id)).map(r => r.content).join('\n\n');
 
-      const res = await fetch('/api/refine-rubric', {
+      const res = await fetch('/api/build-rubric', {
         method: 'POST',
         headers,
         body: JSON.stringify({ 
-          baseRubric: tempRubric,
           content: schedule.homeworkContent,
-          resourcesText
+          resourcesText,
+          userDraft: tempRubric
         })
       });
       
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 100)}`);
+      }
       if (!res.ok || data.error) throw new Error(data.error || res.statusText);
       
       setRubricContent(data.rubric);

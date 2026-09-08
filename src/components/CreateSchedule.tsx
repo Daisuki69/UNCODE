@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Loader2, Sparkles, Pencil, ArrowRight, Clock, AlertTriangle, ShieldAlert } from 'lucide-react';
-import { AppSettings, ScheduleData, SavedResource } from '../types';
+import { ScheduleData, SavedResource } from '../types';
 
 interface CreateScheduleProps {
   role: string;
@@ -8,7 +8,7 @@ interface CreateScheduleProps {
   apiKey?: string;
   apiModel?: string;
   existingSchedules: ScheduleData[];
-  settings: AppSettings;
+  settings: any;
   addLog: (action: string, details?: string) => void;
   onSave: (schedule: ScheduleData) => void;
   onCancel: () => void;
@@ -28,7 +28,7 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
   useEffect(() => {
     localStorage.setItem('draft_homeworkContent', homeworkContent);
   }, [homeworkContent]);
-  const [rubricMode] = useState<'ai' | 'manual'>('manual');
+  const [rubricMode, setRubricMode] = useState<'ai' | 'manual'>('manual'); // 'ai' unused in UI
   const [rubricContent, setRubricContent] = useState('');
   const [activationTime, setActivationTime] = useState('19:00');
   const [durationMinutes, setDurationMinutes] = useState(60);
@@ -49,6 +49,11 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 25 * 1024 * 1024) {
+      showError('File is too large. Please upload a file smaller than 25MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     setIsParsing(true);
     const formData = new FormData();
@@ -79,6 +84,9 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
         if (res.status === 413) {
            throw new Error('File is too large. Please upload a smaller file (under 30MB).');
         }
+        if (text.includes('<!doctype html>') || text.includes('<!DOCTYPE html>')) {
+          throw new Error('Server returned an unexpected page (possibly due to a proxy or cold start). Please try your upload again.');
+        }
         throw new Error(`Server returned unexpected response (${res.status}): ${text.substring(0, 50)}...`);
       }
       
@@ -88,11 +96,13 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
         }
         throw new Error(data.error || res.statusText);
       }
+      
       setHomeworkContent(data.content);
-      // Removed schedule title extraction so we don't display the filename
-      // if (data.title) setScheduleTitle(data.title);
       addLog('Uploaded Homework File', file.name);
       setValidationError(null);
+
+            if (data.title) setScheduleTitle(data.title);
+
     } catch (err: any) {
       showError(`Failed to parse document: ${err.message}`);
       addLog('Error', `Parsing failed: ${err.message}`);
@@ -118,15 +128,27 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
       if (apiKey) headers['x-api-key'] = apiKey;
       if (apiModel) headers['x-api-model'] = apiModel;
 
-      const selectedResources = resources.filter(r => selectedResourceIds.includes(r.id));
-      const resourcesText = selectedResources.map(r => `=== ${r.title} ===\n${r.content}`).join('\n\n');
+      const selectedResources = resources.filter(r => selectedResourceIds.includes(r.id) && r.id !== 'ai-general-knowledge');
+      let resourcesText = selectedResources.map(r => `=== ${r.title} ===\n${r.content}`).join('\n\n');
       
-      const res = await fetch('/api/generate-rubric', {
+      if (selectedResourceIds.includes('ai-general-knowledge')) {
+         resourcesText += '\n\n=== SYSTEM NOTE ===\nThe AI is authorized to use external general knowledge to complete this task.';
+      }
+      
+      const res = await fetch('/api/build-rubric', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ content: homeworkContent, role, resourcesText })
+        body: JSON.stringify({ content: homeworkContent, resourcesText, userDraft: "None" })
       });
-      const data = await res.json();
+      
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 100)}`);
+      }
+
       if (!res.ok || data.error) {
         if (res.status === 401 || (data.error && typeof data.error === 'string' && data.error.includes('UNAUTHENTICATED'))) {
           throw new Error('Invalid API Key. Please update your API key in the Dashboard Settings.');
@@ -157,17 +179,23 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
       
       const resourcesText = resources.filter(r => selectedResourceIds.includes(r.id)).map(r => r.content).join('\n\n');
       
-      const res = await fetch('/api/refine-rubric', {
+      const res = await fetch('/api/build-rubric', {
         method: 'POST',
         headers,
         body: JSON.stringify({ 
-          baseRubric: tempRubric,
           content: homeworkContent,
-          resourcesText 
+          resourcesText,
+          userDraft: tempRubric
         })
       });
       
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 100)}`);
+      }
       if (!res.ok || data.error) throw new Error(data.error || res.statusText);
       
       setRubricContent(data.rubric);
@@ -217,28 +245,11 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
     }
 
     setIsValidating(true);
-    let correctedContent = homeworkContent;
-
-    // Auto-correct grammar
-    try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (apiKey) headers['x-api-key'] = apiKey;
-      if (apiModel) headers['x-api-model'] = apiModel;
-      
-      const correctRes = await fetch('/api/correct-text', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ text: homeworkContent })
-      });
-      const correctData = await correctRes.json();
-      if (correctRes.ok && correctData.corrected) {
-        correctedContent = correctData.corrected;
-        setHomeworkContent(correctedContent);
-      }
-    } catch (err: any) {
-      console.error('Auto-correct error', err);
-      showError(`AI Auto-correct Error: ${err.message || 'Unknown error. Check quota or API key.'}`);
+    
+    // Auto-bypass validation if general knowledge is selected
+    if (selectedResourceIds.includes('ai-general-knowledge')) {
       setIsValidating(false);
+      setStep(3);
       return;
     }
 
@@ -248,13 +259,13 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
         if (apiKey) headers['x-api-key'] = apiKey;
         if (apiModel) headers['x-api-model'] = apiModel;
 
-        const selectedResources = resources.filter(r => selectedResourceIds.includes(r.id));
+        const selectedResources = resources.filter(r => selectedResourceIds.includes(r.id) && r.id !== 'ai-general-knowledge');
         const resourcesText = selectedResources.map(r => `=== ${r.title} ===\n${r.content}`).join('\n\n');
         
         const res = await fetch('/api/validate-homework', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ content: correctedContent, resourcesText })
+          body: JSON.stringify({ content: homeworkContent, resourcesText })
         });
         
         const data = await res.json();
@@ -357,17 +368,31 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
             <p className="text-gray-500 text-sm mb-6">Which resources should the AI use to evaluate this homework?</p>
             
             <div className="space-y-3 mb-6 flex-1 overflow-y-auto">
-              {resources.length === 0 ? (
-                <p className="text-gray-500 italic">No resources available. Please save some from the Dashboard first if you want AI to grade against them.</p>
-              ) : (
-                resources.map(r => (
+              {(
+                [
+                  { id: 'ai-general-knowledge', title: '🌐 General AI Knowledge (Bypass validation)', content: 'Allows the AI to use its pre-trained general knowledge.' },
+                  ...resources
+                ].map(r => (
                   <label key={r.id} className="flex items-center p-4 border rounded-xl cursor-pointer hover:bg-gray-50 transition-colors">
                     <input 
                       type="checkbox" 
                       checked={selectedResourceIds.includes(r.id)}
                       onChange={(e) => {
-                        if (e.target.checked) setSelectedResourceIds([...selectedResourceIds, r.id]);
-                        else setSelectedResourceIds(selectedResourceIds.filter(id => id !== r.id));
+                        let newSelection = [...selectedResourceIds];
+                        if (e.target.checked) {
+                          newSelection.push(r.id);
+                        } else {
+                          newSelection = newSelection.filter(id => id !== r.id);
+                        }
+                        
+                        // Enforce the rule: If "ai-general-knowledge" is selected, max 1 other resource allowed (total 2).
+                        const hasAI = newSelection.includes('ai-general-knowledge');
+                        if (hasAI && newSelection.length > 2) {
+                          showError("When using General AI Knowledge, you can only select ONE other resource to append data to.");
+                          return;
+                        }
+
+                        setSelectedResourceIds(newSelection);
                         setValidationError(null);
                       }}
                       className="w-5 h-5 text-red-600 rounded border-gray-300 focus:ring-red-500"
@@ -392,6 +417,19 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
           <div className="flex-1 flex flex-col">
             <h3 className="text-lg font-bold text-gray-800 mb-4">Step 2: Define the Homework</h3>
             <p className="text-gray-500 text-sm mb-4">What are you supposed to do? Upload your assignment to extract the requirements.</p>
+
+
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-gray-700 mb-2">Session Title</label>
+              <input 
+                type="text" 
+                value={scheduleTitle}
+                onChange={(e) => setScheduleTitle(e.target.value)}
+                placeholder="e.g., Math Homework, History Essay"
+                className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+              />
+            </div>
+
             
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm font-bold text-gray-700">Image OCR Type:</span>

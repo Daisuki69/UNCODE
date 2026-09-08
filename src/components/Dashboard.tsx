@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, BookOpen, Trash2, Plus, Sparkles, Pencil, Upload, Loader2, Settings, ShieldAlert, X, GitMerge, FileText } from 'lucide-react';
-import { AppSettings, SavedResource, ScheduleData } from '../types';
+import { Clock, BookOpen, Trash2, Plus, Sparkles, Pencil, Upload, Loader2, Settings, ShieldAlert, X, GitMerge, FileText, Calculator, Music, Globe, MessageSquare, MonitorPlay, Check, LayoutGrid } from 'lucide-react';
+import { AppSettings, SavedResource, ScheduleData, AllowedApp } from '../types';
+import { getInstalledApps } from '../systemBridge';
 
 interface DashboardProps {
   settings: AppSettings;
@@ -23,6 +24,7 @@ interface DashboardProps {
   timeOffset: number;
   onTimeOverride: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onResetTime: () => void;
+  onSettingsChange?: (updates: Partial<AppSettings>) => void;
 }
 
 const pageVariants = {
@@ -36,6 +38,17 @@ const pageVariants = {
     x: direction === 'forward' ? '-100%' : '100%'
   })
 };
+
+const SIMULATED_APPS = [
+  { id: 'com.apple.calculator', name: 'Calculator', iconName: 'Calculator' },
+  { id: 'com.microsoft.word', name: 'Word', iconName: 'FileText' },
+  { id: 'com.spotify.music', name: 'Spotify', iconName: 'Music' },
+  { id: 'com.google.chrome', name: 'Chrome', iconName: 'Globe' },
+  { id: 'notion.id', name: 'Notion', iconName: 'BookOpen' },
+  { id: 'com.apple.MobileSMS', name: 'Messages', iconName: 'MessageSquare' },
+  { id: 'com.youtube.app', name: 'YouTube', iconName: 'MonitorPlay' },
+];
+
 export function Dashboard({ 
   settings, 
   timeUntilLock,
@@ -55,8 +68,21 @@ export function Dashboard({
   displayTime,
   timeOffset,
   onTimeOverride,
-  onResetTime
+  onResetTime,
+  onSettingsChange
 }: DashboardProps) {
+  const [isAppSelectorOpen, setIsAppSelectorOpen] = useState(false);
+  const [availableApps, setAvailableApps] = useState<AllowedApp[]>(SIMULATED_APPS);
+  
+  useEffect(() => {
+    if (isAppSelectorOpen) {
+      getInstalledApps().then(nativeApps => {
+        if (nativeApps && nativeApps.length > 0) {
+          setAvailableApps(nativeApps);
+        }
+      });
+    }
+  }, [isAppSelectorOpen]);
   
   const [navDirection, setNavDirection] = useState<'forward' | 'backward'>('forward');
   const [editingResource, setEditingResource] = useState<SavedResource | 'new' | null>(null);
@@ -69,10 +95,10 @@ export function Dashboard({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const formatForInput = useCallback((d: Date) => {
+  const formatForInput = (d: Date) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
     return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  }, []);
+  };
 
   useEffect(() => {
     if (onResourceEditStateChange) {
@@ -81,37 +107,27 @@ export function Dashboard({
   }, [editingResource, onResourceEditStateChange]);
 
 
-  const closeResourceEditor = useCallback(() => {
-    setNavDirection('backward');
-    setEditingResource(null);
-    setIsConfirmingDelete(false);
-  }, []);
-
-  const openNewResource = useCallback(() => {
+  const openNewResource = () => {
     setNavDirection('forward');
     setEditingResource('new');
     setNewResTitle('');
     setNewResContent('');
-  }, []);
+  };
 
-  const openEditResource = useCallback((res: SavedResource) => {
+  const openEditResource = (res: SavedResource) => {
     setNavDirection('forward');
     setEditingResource(res);
     setNewResTitle(res.title);
     setNewResContent(res.content);
-  }, []);
+  };
 
   
-  const handleSaveAndCleanup = useCallback(async (e: React.FormEvent) => {
+  const handleSaveAndCleanup = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedTitle = newResTitle.trim();
-    const trimmedContent = newResContent.trim();
-    if (!trimmedTitle && !trimmedContent) {
-      return;
-    }
+    if (!newResTitle.trim() && !newResContent.trim()) return;
 
     setIsDecluttering(true);
-    let finalTitle = trimmedTitle;
+    let finalTitle = newResTitle;
     let finalContent = newResContent;
 
     try {
@@ -119,28 +135,35 @@ export function Dashboard({
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         headers['x-api-key'] = settings.apiKey;
         if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
-        if (settings.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
-        if (settings.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
-        if (settings.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
-        headers['x-ocr-type'] = ocrType;
+      if (settings.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
+      if (settings.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
+      if (settings.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
+      headers['x-ocr-type'] = ocrType;
 
         const res = await fetch('/api/declutter-resource', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ title: trimmedTitle, content: trimmedContent })
+          body: JSON.stringify({ title: newResTitle, content: newResContent })
         });
-
-        const contentType = res.headers.get('content-type') || '';
-        const rawText = contentType.includes('application/json') ? await res.text() : '';
-        const data = contentType.includes('application/json') ? JSON.parse(rawText || '{}') : null;
-
-        if (res.ok && data && !data.error) {
-          if (typeof data.title === 'string' && data.title.trim()) finalTitle = data.title.trim();
-          if (typeof data.content === 'string' && data.content.trim()) finalContent = data.content;
-        } else if (res.status === 404 || res.status === 500) {
-          console.warn('Declutter service unavailable; preserving the entered title.');
-        } else if (data?.error) {
-          console.error('Declutter AI error', data.error);
+        
+        const data = await res.json();
+        if (res.ok && !data.error) {
+          if (!newResTitle.trim() && data.title) finalTitle = data.title;
+          if (data.content) finalContent = data.content;
+        } else {
+          console.error("Declutter AI error", data.error);
+          
+          let errMsg = data.error;
+          if (typeof errMsg === 'object') {
+             errMsg = errMsg.message || JSON.stringify(errMsg);
+          }
+          if (errMsg && (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota'))) {
+            showError("AI Rate Limit Exceeded. Your resource was NOT saved. Please wait a minute or update your API Key.");
+          } else {
+            showError(`AI Error: ${errMsg || 'Failed to clean up.'} Your resource was NOT saved.`);
+          }
+          setIsDecluttering(false);
+          return; // Stop the save process entirely
         }
       }
     } catch (err: any) {
@@ -149,99 +172,94 @@ export function Dashboard({
       setIsDecluttering(false);
     }
 
-    const baseTitle = finalTitle.trim();
-    const preservedTitle = baseTitle || (editingResource && editingResource !== 'new' ? editingResource.title.trim() : '');
-    if (!preservedTitle) {
-      showError('A proper resource title is required before saving. Please add one or try a document upload that generates a title.');
-      return;
-    }
-
     if (editingResource === 'new') {
-      onAddResource(preservedTitle, finalContent);
+      onAddResource(finalTitle || 'Untitled Resource', finalContent);
     } else if (editingResource) {
-      onUpdateResource(editingResource.id, preservedTitle, finalContent);
+      onUpdateResource(editingResource.id, finalTitle || 'Untitled Resource', finalContent);
     }
+    { setNavDirection('backward'); setEditingResource(null); };
+  };
 
-    closeResourceEditor();
-  }, [closeResourceEditor, editingResource, newResContent, newResTitle, ocrType, onAddResource, onUpdateResource, settings.apiKey, settings.apiModel, settings.formattedOcrKey, settings.prompts, settings.simpleOcrKey, showError]);
 
-
-  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.size > 25 * 1024 * 1024) {
+      showError('File is too large. Please upload a file smaller than 25MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     setIsParsing(true);
     const formData = new FormData();
     formData.append('document', file);
-    formData.append('type', 'homework');
+    formData.append('type', 'transcription'); // Dump raw OCR text for manual review before cleanup
 
     try {
       const headers: Record<string, string> = {};
       if (settings.apiKey) headers['x-api-key'] = settings.apiKey;
       if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
       if (settings.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
+
       if (settings.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
       if (settings.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
       headers['x-ocr-type'] = ocrType;
-
-      const res = await fetch('/api/parse-resource', {
-        method: 'POST',
+      const res = await fetch('/api/parse-resource', { 
+        method: 'POST', 
         headers,
-        body: formData
+        body: formData 
       });
-
+      
       let data;
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
         data = await res.json();
       } else {
         const text = await res.text();
         if (res.status === 413) {
-          throw new Error('File is too large. Please upload a smaller file (under 30MB).');
+           throw new Error('File is too large. Please upload a smaller file (under 30MB).');
         }
-        if (res.status === 404) {
-          throw new Error('The resource parser is unavailable right now. Please restart the app and try again.');
+        if (text.includes('<!doctype html>') || text.includes('<!DOCTYPE html>')) {
+          throw new Error('Server returned an unexpected page (possibly due to a proxy or cold start). Please try your upload again.');
         }
-        throw new Error(text ? text.substring(0, 120) : `Server returned unexpected response (${res.status}).`);
+        throw new Error(`Server returned unexpected response (${res.status}): ${text.substring(0, 50)}...`);
       }
-
+      
       if (!res.ok || data.error) {
         if (res.status === 401 || (data.error && typeof data.error === 'string' && data.error.includes('UNAUTHENTICATED'))) {
           throw new Error('Invalid API Key. Please update your API key in the Dashboard Settings.');
         }
-        if (res.status === 404) {
-          throw new Error('The resource parser is unavailable right now. Please restart the app and try again.');
-        }
         throw new Error(data.error || res.statusText);
       }
-
+      
       setNewResContent(data.content);
+      // Leave title empty as requested
     } catch (err: any) {
       showError(`Failed to parse document: ${err.message}`);
     } finally {
       setIsParsing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, [ocrType, settings.apiKey, settings.apiModel, settings.formattedOcrKey, settings.prompts, settings.simpleOcrKey, showError]);
+  };
 
-  const formatTimeLeft = useCallback((seconds: number | null) => {
+  const formatTimeLeft = (seconds: number | null) => {
     if (seconds === null) return '--:--:--';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  }, []);
+  };
 
-  const format12Hour = useCallback((time24: string) => {
+  const format12Hour = (time24: string) => {
     const [h, m] = time24.split(':').map(Number);
     const ampm = h >= 12 ? 'PM' : 'AM';
     const h12 = h % 12 || 12;
     return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
-  }, []);
+  };
 
-  const schedules = useMemo(() => settings.schedules || [], [settings.schedules]);
-  const activeSchedules = useMemo(() => schedules.filter(s => s.isActive), [schedules]);
-  const canCreateSchedule = Boolean(settings.apiKey && (settings.simpleOcrKey || settings.formattedOcrKey));
+  const schedules = settings.schedules || [];
+  const activeSchedules = schedules.filter(s => s.isActive);
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -310,21 +328,19 @@ export function Dashboard({
           )}
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Resource Title</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wider">Resource Title</label>
             <input
               type="text"
-              placeholder="e.g. History Chapter 4"
               value={newResTitle}
               onChange={(e) => setNewResTitle(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 font-bold"
-              required
+              className="w-full p-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 bg-gray-50 text-lg font-medium"
+              placeholder="E.g., Chapter 4: Memory Management"
             />
           </div>
 
-          <div className="flex-1 flex flex-col">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Content</label>
+          <div className="flex-1 flex flex-col min-h-0">
+            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wider">Raw Text</label>
             <textarea
-              placeholder="Paste or type content here..."
               value={newResContent}
               onChange={(e) => setNewResContent(e.target.value)}
               className="flex-1 min-h-[300px] w-full p-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 resize-none font-mono text-sm leading-relaxed"
@@ -358,7 +374,10 @@ export function Dashboard({
             <div className="flex space-x-4">
               <button 
                 type="button" 
-                onClick={closeResourceEditor}
+                onClick={() => {
+                  { setNavDirection('backward'); setEditingResource(null); };
+                  setIsConfirmingDelete(false);
+                }}
                 className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors"
               >
                 Cancel
@@ -376,7 +395,6 @@ export function Dashboard({
                   <><Sparkles className="w-5 h-5 mr-2" /> Save & Clean Up</>
                 )}
               </button>
-
             </div>
           </div>
         </form>
@@ -400,20 +418,29 @@ export function Dashboard({
                   {resources.filter(r => r.id !== mergingResource.id).length === 0 ? (
                     <p className="text-gray-500 text-center py-8">No other resources available to combine with.</p>
                   ) : (
-                    resources.filter(r => r.id !== mergingResource.id).map(r => (
+                    resources.filter(r => r.id !== mergingResource.id).map(r => {
+                      const isLocked = settings.schedules.some(s => s.isActive && (s.selectedResourceIds || []).includes(r.id));
+                      return (
                       <button
                         key={r.id}
                         onClick={() => {
+                          if (isLocked) {
+                            showError(`Cannot combine with "${r.title}" because it is currently attached to an active schedule.`);
+                            return;
+                          }
                           onCombineResources(mergingResource.id, r.id);
                           setMergingResource(null);
-                          closeResourceEditor();
+                          { setNavDirection('backward'); setEditingResource(null); }; // Close the edit window too as they merged
                         }}
-                        className="p-4 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-xl flex flex-col text-left transition-colors"
+                        className={`p-4 rounded-xl flex flex-col text-left transition-colors ${isLocked ? 'bg-gray-100 border border-gray-200 opacity-60 cursor-not-allowed' : 'bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200'}`}
                       >
-                        <span className="font-bold text-gray-900">{r.title}</span>
+                        <div className="flex justify-between items-center w-full">
+                           <span className={`font-bold ${isLocked ? 'text-gray-500' : 'text-gray-900'}`}>{r.title}</span>
+                           {isLocked && <span className="text-[10px] font-bold text-red-500 uppercase">Locked</span>}
+                        </div>
                         <span className="text-xs text-gray-500 mt-1 line-clamp-1">{r.content}</span>
                       </button>
-                    ))
+                    )})
                   )}
                 </div>
               </div>
@@ -444,7 +471,8 @@ export function Dashboard({
                   type="button"
                   onClick={() => {
                     onRemoveResource(editingResource.id);
-                    closeResourceEditor();
+                    { setNavDirection('backward'); setEditingResource(null); };
+                    setIsConfirmingDelete(false);
                   }}
                   className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors"
                 >
@@ -532,10 +560,12 @@ export function Dashboard({
             </div>
           )}
           <button
-            disabled={!canCreateSchedule}
-            onClick={onCreateSchedule}
+            disabled={!settings.apiKey || (!settings.simpleOcrKey && !settings.formattedOcrKey)}
+            onClick={() => {
+              onCreateSchedule();
+            }}
             className={`px-6 py-3 font-bold rounded-xl shadow-lg transition-all flex items-center ${
-              canCreateSchedule
+              (settings.apiKey && (settings.simpleOcrKey || settings.formattedOcrKey))
                 ? 'bg-red-600 hover:bg-red-700 text-white' 
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
@@ -618,6 +648,23 @@ export function Dashboard({
                     </div>
                   </div>
 
+                  {schedule.selectedResourceIds && schedule.selectedResourceIds.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Attached Resources</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {schedule.selectedResourceIds.map(resId => {
+                          const res = resources.find(r => r.id === resId);
+                          return res ? (
+                            <span key={res.id} className="px-2 py-1 bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 flex items-center">
+                              <FileText className="w-3 h-3 mr-1 text-gray-400" />
+                              {res.title}
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center">
                       {schedule.rubricMode === 'ai' ? <Sparkles className="w-4 h-4 mr-1 text-red-500" /> : <Pencil className="w-4 h-4 mr-1 text-gray-500" />}
@@ -664,21 +711,165 @@ export function Dashboard({
           </div>
         ) : (
           <div className="flex flex-col space-y-3 max-h-[300px] overflow-y-auto pr-2">
-            {resources.map((res) => (
+            {resources.map((res) => {
+              const isLocked = settings.schedules.some(s => s.isActive && (s.selectedResourceIds || []).includes(res.id));
+              return (
               <div 
                 key={res.id} 
-                onClick={() => openEditResource(res)}
-                className="group p-4 bg-white border border-gray-200 rounded-xl hover:border-gray-900 cursor-pointer transition-all shadow-sm flex items-center justify-between text-left w-full"
+                onClick={() => {
+                  if (isLocked) {
+                    showError(`Cannot edit "${res.title}" because it is currently attached to an active schedule. Please pause the schedule first.`);
+                    return;
+                  }
+                  openEditResource(res);
+                }}
+                className={`group p-4 bg-white border border-gray-200 rounded-xl transition-all shadow-sm flex items-center justify-between text-left w-full ${isLocked ? 'opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed' : 'hover:border-gray-900 cursor-pointer'}`}
               >
                 <div className="flex items-center">
-                  <BookOpen className="w-5 h-5 text-gray-400 mr-3 group-hover:text-gray-900 transition-colors" />
-                  <h3 className="font-bold text-gray-900 text-base">{res.title}</h3>
+                  <BookOpen className={`w-5 h-5 mr-3 transition-colors ${isLocked ? 'text-gray-300' : 'text-gray-400 group-hover:text-gray-900'}`} />
+                  <h3 className={`font-bold text-base ${isLocked ? 'text-gray-500' : 'text-gray-900'}`}>{res.title}</h3>
                 </div>
+                {isLocked && <div className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded border border-red-100 uppercase tracking-wider flex items-center"><ShieldAlert className="w-3 h-3 mr-1" /> Locked</div>}
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>
+
+      {/* Allowed Apps Section */}
+      <div className="mt-8 bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center">
+            <LayoutGrid className="w-6 h-6 mr-2 text-gray-500" />
+            Allowed Applications
+          </h2>
+          <button
+            onClick={() => setIsAppSelectorOpen(true)}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors flex items-center"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add App
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mb-6">These applications will remain accessible when the system is locked.</p>
+
+        {(!settings.allowedApps || settings.allowedApps.length === 0) ? (
+          <div className="flex flex-col items-center justify-center text-gray-400 p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+            <LayoutGrid className="w-12 h-12 mb-4 opacity-20" />
+            <p className="font-bold text-gray-500 mb-1">No apps allowed</p>
+            <p className="text-sm">Everything will be blocked during lock unless you add apps here.</p>
+          </div>
+        ) : (
+          <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+            {settings.allowedApps.map((app) => {
+              const IconComp = [Calculator, FileText, Music, Globe, BookOpen, MessageSquare, MonitorPlay].find(c => c.name === app.iconName || c.displayName === app.iconName || c.render?.name === app.iconName) || LayoutGrid;
+              // Simple mapping to get the correct icon component
+              const iconMap: Record<string, React.ElementType> = {
+                'Calculator': Calculator,
+                'FileText': FileText,
+                'Music': Music,
+                'Globe': Globe,
+                'BookOpen': BookOpen,
+                'MessageSquare': MessageSquare,
+                'MonitorPlay': MonitorPlay
+              };
+              const RenderIcon = iconMap[app.iconName] || LayoutGrid;
+
+              return (
+                <div key={app.id} className="flex flex-col items-center flex-shrink-0 group relative">
+                  <button
+                    onClick={() => {
+                      if (onSettingsChange) {
+                        onSettingsChange({
+                          allowedApps: settings.allowedApps!.filter(a => a.id !== app.id)
+                        });
+                      }
+                    }}
+                    className="absolute -top-2 -right-2 bg-gray-900 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-500"
+                    title="Remove App"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                  <div className="w-16 h-16 bg-gray-100 border border-gray-200 rounded-2xl flex items-center justify-center mb-2 group-hover:bg-gray-200 transition-colors shadow-sm">
+                    <RenderIcon className="w-8 h-8 text-gray-700" />
+                  </div>
+                  <span className="text-xs font-semibold text-gray-700 w-16 text-center truncate">{app.name}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      
+      {/* App Selector Modal */}
+      <AnimatePresence>
+        {isAppSelectorOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl p-8 max-w-lg w-full flex flex-col shadow-2xl overflow-hidden">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-black text-gray-900">Select Allowed Apps</h3>
+                  <p className="text-sm text-gray-500 mt-1">Choose apps to whitelist during system lock</p>
+                </div>
+                <button onClick={() => setIsAppSelectorOpen(false)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-y-6 gap-x-4 max-h-[60vh] overflow-y-auto py-2">
+                {availableApps.map((simApp) => {
+                  const iconMap: Record<string, React.ElementType> = {
+                    'Calculator': Calculator,
+                    'FileText': FileText,
+                    'Music': Music,
+                    'Globe': Globe,
+                    'BookOpen': BookOpen,
+                    'MessageSquare': MessageSquare,
+                    'MonitorPlay': MonitorPlay
+                  };
+                  const RenderIcon = iconMap[simApp.iconName] || LayoutGrid;
+                  const isSelected = (settings.allowedApps || []).some(a => a.id === simApp.id);
+                  
+                  return (
+                    <div 
+                      key={simApp.id}
+                      onClick={() => {
+                        if (!onSettingsChange) return;
+                        const current = settings.allowedApps || [];
+                        if (isSelected) {
+                          onSettingsChange({ allowedApps: current.filter(a => a.id !== simApp.id) });
+                        } else {
+                          onSettingsChange({ allowedApps: [...current, simApp] });
+                        }
+                      }}
+                      className="flex flex-col items-center cursor-pointer group"
+                    >
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-2 transition-all relative ${isSelected ? 'bg-blue-50 border-2 border-blue-500 text-blue-600 shadow-sm' : 'bg-gray-50 border border-gray-200 text-gray-500 hover:border-gray-400 hover:shadow-sm'}`}>
+                        {isSelected && (
+                          <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 border-2 border-white">
+                            <Check className="w-2.5 h-2.5" />
+                          </div>
+                        )}
+                        <RenderIcon className="w-7 h-7" />
+                      </div>
+                      <span className={`text-[10px] font-bold text-center w-full truncate px-1 ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>{simApp.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div className="mt-8 flex justify-end">
+                <button 
+                  onClick={() => setIsAppSelectorOpen(false)}
+                  className="px-6 py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-xl transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

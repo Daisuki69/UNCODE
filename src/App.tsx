@@ -10,6 +10,7 @@ import { EditRubric } from './components/EditRubric';
 import { HomeworksPage } from './components/HomeworksPage';
 import { Loader2, AlertTriangle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { startLockdown, endLockdown } from './systemBridge';
 
 const modalVariants = {
   initial: { opacity: 0 },
@@ -31,15 +32,21 @@ const ModalTransition = ({ children, keyStr }: { children: React.ReactNode, keyS
   </motion.div>
 );
 const pageVariants = {
-  initial: (direction: 'forward' | 'backward') => ({
-    opacity: 0,
-    x: direction === 'forward' ? '100%' : '-100%'
-  }),
+  initial: (direction: 'forward' | 'backward') => {
+    console.log("initial direction:", direction);
+    return {
+      opacity: 0,
+      x: direction === 'forward' ? '100%' : '-100%'
+    };
+  },
   animate: { opacity: 1, x: 0 },
-  exit: (direction: 'forward' | 'backward') => ({
-    opacity: 0,
-    x: direction === 'forward' ? '-100%' : '100%'
-  })
+  exit: (direction: 'forward' | 'backward') => {
+    console.log("exit direction:", direction);
+    return {
+      opacity: 0,
+      x: direction === 'forward' ? '-100%' : '100%'
+    };
+  }
 };
 
 const PageTransition = ({ children, keyStr, direction = 'forward' }: { children: React.ReactNode, keyStr: string, direction?: 'forward' | 'backward' }) => (
@@ -221,7 +228,10 @@ export default function App() {
         if (inWindow) {
           setLockEndTime(lockEnd);
           setActiveScheduleId(schedule.id);
-          navigate('locked');
+          if (appState !== 'locked') {
+            startLockdown(settings.allowedApps?.map(a => a.id) || []);
+            navigate('locked');
+          }
           foundActive = true;
           return; // Exit out of checkSchedule completely
         }
@@ -276,6 +286,7 @@ export default function App() {
   };
 
   const handleTimeout = useCallback((skipped?: boolean) => {
+    endLockdown(); // Always release native lock if timer runs out or is skipped
     notifyUser(skipped ? 'Lock skipped (Test mode)' : 'Lock duration expired. Device access restored.');
     if (skipped && activeScheduleId) {
       setSettings(prev => ({
@@ -306,15 +317,11 @@ export default function App() {
   };
 
   const handleAddResource = (title: string, content: string) => {
-    const cleanedTitle = title.trim();
-    if (!cleanedTitle) return;
-    setResources(prev => [...prev, { id: crypto.randomUUID(), title: cleanedTitle, content, createdAt: Date.now() }]);
+    setResources([...resources, { id: crypto.randomUUID(), title, content, createdAt: Date.now() }]);
   };
 
   const handleUpdateResource = (id: string, title: string, content: string) => {
-    const cleanedTitle = title.trim();
-    if (!cleanedTitle) return;
-    setResources(prev => prev.map(r => r.id === id ? { ...r, title: cleanedTitle, content } : r));
+    setResources(resources.map(r => r.id === id ? { ...r, title, content } : r));
   };
 
   const handleRemoveResource = (id: string) => {
@@ -377,57 +384,81 @@ export default function App() {
       });
       
       const rawText = await res.text();
-      let data: Record<string, unknown> = {};
+      let data: any = {};
       try {
-        data = JSON.parse(rawText) as Record<string, unknown>;
-      } catch (error) {
-        console.error('Failed to parse response as JSON. Raw text:', rawText.substring(0, 200), error);
+        data = JSON.parse(rawText);
+      } catch (e) {
+        console.error("Failed to parse response as JSON. Raw text:", rawText.substring(0, 200));
         if (!res.ok) {
           throw new Error(`Server error (${res.status}): The server returned an invalid response. Please try again.`);
+        } else {
+          throw new Error(`Unexpected response format from server. Please try again.`);
         }
-        throw new Error('Unexpected response format from server. Please try again.');
       }
 
       if (!res.ok) {
         if (res.status === 413) {
           throw new Error('The image file is too large. Please compress it or take a lower resolution photo.');
         }
-        const errorMessage = typeof data.error === 'string' ? data.error : '';
-        if (res.status === 401 || errorMessage.includes('UNAUTHENTICATED')) {
+        if (res.status === 401 || (data.error && data.error.includes('UNAUTHENTICATED'))) {
           throw new Error('Invalid API Key. Please update your API key in the Settings overlay.');
         }
-        throw new Error(errorMessage || 'Evaluation failed');
+        throw new Error(data.error || 'Evaluation failed');
       }
-
-      const evaluation = data as Partial<IEvaluationResult>;
-      if (typeof evaluation.passed !== 'boolean' || typeof evaluation.feedback !== 'string' || typeof evaluation.transcribedText !== 'string') {
-        throw new Error('The server returned an invalid evaluation payload.');
-      }
-
-      const typedEvaluation: IEvaluationResult = {
-        passed: evaluation.passed,
-        feedback: evaluation.feedback,
-        transcribedText: evaluation.transcribedText,
-        wordCount: typeof evaluation.wordCount === 'number' ? evaluation.wordCount : undefined,
-        sentenceCount: typeof evaluation.sentenceCount === 'number' ? evaluation.sentenceCount : undefined,
-      };
-
-      setEvaluationResult(typedEvaluation);
+      
+      
+      setEvaluationResult(data);
       setCompletedHomeworks(prev => [{
         id: crypto.randomUUID(),
         title: activeSchedule?.title || 'Untitled Schedule',
         homeworkContent: activeSchedule?.homeworkContent || '',
         rubricContent: activeSchedule?.rubricContent || '',
-        transcribedText: typedEvaluation.transcribedText,
-        feedback: typedEvaluation.feedback,
-        passed: typedEvaluation.passed,
+        transcribedText: data.transcribedText || '',
+        feedback: data.feedback || '',
+        passed: data.passed || false,
         timestamp: Date.now()
       }, ...prev]);
 
-      navigate('result');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      setGlobalError(`Evaluation Error: ${message}`);
+      if (data.passed) {
+        // Auto-Harvesting Logic
+        if (activeSchedule?.selectedResourceIds?.includes('ai-general-knowledge')) {
+          const textToHarvest = activeSchedule.aiAnswer || transcribedText || data.transcribedText;
+          if (textToHarvest) {
+            try {
+              // Background call to declutter and save
+              const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+              if (settings.apiKey) headers['x-api-key'] = settings.apiKey;
+              if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
+              
+              fetch('/api/declutter-resource', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ title: "AI Research: " + (activeSchedule.title || "Topic"), content: textToHarvest })
+              }).then(res => res.json()).then(harvestData => {
+                const realResources = activeSchedule.selectedResourceIds.filter(id => id !== 'ai-general-knowledge');
+                if (realResources.length > 0) {
+                  // Append to existing
+                  setResources(prev => prev.map(r => r.id === realResources[0] ? { ...r, content: r.content + '\n\n' + harvestData.content } : r));
+                } else {
+                  // Create new
+                  setResources(prev => [...prev, { id: crypto.randomUUID(), title: harvestData.title || "AI Research", content: harvestData.content, createdAt: Date.now() }]);
+                }
+              }).catch(console.error);
+            } catch (e) {
+              console.error("Auto harvest failed", e);
+            }
+          }
+        }
+        
+        // Only clean up the lockscreen data if the student passed
+        localStorage.removeItem(`lockscreen_data_${scheduleId}`);
+        endLockdown(); // Release the OS lock!
+        navigate('result');
+      } else {
+        navigate('result');
+      }
+    } catch (error: any) {
+      setGlobalError(`Evaluation Error: ${error.message || "Unknown error"}`);
       resumeLock();
     } finally {
       setIsEvaluating(false);
@@ -441,7 +472,7 @@ export default function App() {
     return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   };
 
-  const zoomStyle: React.CSSProperties = settings.uiScale && settings.uiScale !== 100 ? { zoom: `${settings.uiScale}%` } : {};
+  const zoomStyle = settings.uiScale && settings.uiScale !== 100 ? { zoom: `${settings.uiScale}%` } as any : {};
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans selection:bg-red-200 overflow-hidden" style={zoomStyle}>
@@ -478,6 +509,7 @@ export default function App() {
               timeOffset={timeOffset}
               onTimeOverride={handleTimeOverride}
               onResetTime={() => setTimeOffset(0)}
+              onSettingsChange={(updates) => setSettings(prev => ({ ...prev, ...updates }))}
               onResourceEditStateChange={setIsResourceEditing} 
               settings={settings}
               timeUntilLock={timeUntilLock}
@@ -557,6 +589,7 @@ export default function App() {
               onTimeOverride={handleTimeOverride}
               timeOffset={timeOffset}
               onResetTime={() => setTimeOffset(0)}
+              onSettingsChange={(updates) => setSettings(prev => ({ ...prev, ...updates }))}
             />
           </motion.div>
         )}

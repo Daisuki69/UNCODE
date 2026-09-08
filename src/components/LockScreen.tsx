@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Upload, Camera, FileWarning, CheckCircle, Sparkles, X, Loader2, RefreshCcw } from 'lucide-react';
+import { Lock, Upload, Camera, FileWarning, CheckCircle, Sparkles, X, Loader2, RefreshCcw, Calculator, FileText, Music, Globe, MessageSquare, MonitorPlay, BookOpen, LayoutGrid } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ScheduleData, AppSettings, SavedResource } from '../types';
 
@@ -14,9 +14,10 @@ interface LockScreenProps {
   onTimeOverride?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   timeOffset?: number;
   onResetTime?: () => void;
+  onSettingsChange?: (updates: Partial<AppSettings>) => void;
 }
 
-export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmitHomework, onTimeout, getCurrentTime, onTimeOverride, timeOffset, onResetTime }: LockScreenProps) {
+export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmitHomework, onTimeout, getCurrentTime, onTimeOverride, timeOffset, onResetTime, onSettingsChange }: LockScreenProps) {
   const [timeLeft, setTimeLeft] = useState(() => Math.max(0, Math.floor((lockEndTime - getCurrentTime()) / 1000)));
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -32,11 +33,76 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
   const [ocrType, setOcrType] = useState<'simple' | 'formatted'>(settings.defaultOcrType || 'simple');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Load from local storage on mount
+  useEffect(() => {
+    const savedData = localStorage.getItem(`lockscreen_data_${schedule.id}`);
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        if (parsed.transcribedText) {
+          setTranscribedText(parsed.transcribedText);
+        }
+        if (parsed.fileData && parsed.fileName && parsed.fileType) {
+          fetch(parsed.fileData)
+            .then(res => res.blob())
+            .then(blob => {
+              const file = new File([blob], parsed.fileName, { type: parsed.fileType });
+              setSelectedFile(file);
+              setPreviewUrl(URL.createObjectURL(file));
+            });
+        }
+      } catch (e) {
+        console.error("Failed to restore lockscreen data", e);
+      }
+    }
+  }, [schedule.id]);
+
+  // Save to local storage on change
+  useEffect(() => {
+    const saveData = async () => {
+      let fileData = null;
+      let fileName = null;
+      let fileType = null;
+
+      if (selectedFile) {
+        fileName = selectedFile.name;
+        fileType = selectedFile.type;
+        const reader = new FileReader();
+        fileData = await new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(selectedFile);
+        });
+      }
+
+      const dataToSave = {
+        transcribedText,
+        fileData,
+        fileName,
+        fileType
+      };
+      
+      if (!transcribedText && !selectedFile) {
+         localStorage.removeItem(`lockscreen_data_${schedule.id}`);
+      } else {
+         try {
+           localStorage.setItem(`lockscreen_data_${schedule.id}`, JSON.stringify(dataToSave));
+         } catch(e) {
+           console.warn("Storage quota exceeded, could not save image to local storage.");
+         }
+      }
+    };
+
+    saveData();
+  }, [transcribedText, selectedFile, schedule.id]);
+
   const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
   const [aiAnswer, setAiAnswer] = useState<string | null>(null);
   const [showAnswerPopup, setShowAnswerPopup] = useState(false);
 
-  const handleGetAnswer = async () => {
+  const handleGetAnswer = async (force = false) => {
+    setShowAnswerPopup(true);
+    if (aiAnswer && !force) return;
+
     setIsGeneratingAnswer(true);
     setShowAnswerPopup(true);
     setAiAnswer(null);
@@ -46,7 +112,10 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
       if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
       if (settings.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
 
-      const resourcesText = resources.filter(r => (schedule.selectedResourceIds || []).includes(r.id)).map(r => `--- ${r.title} ---\n${r.content}`).join('\n\n');
+      let resourcesText = resources.filter(r => (schedule.selectedResourceIds || []).includes(r.id)).map(r => `--- ${r.title} ---\n${r.content}`).join('\n\n');
+      if ((schedule.selectedResourceIds || []).includes('ai-general-knowledge')) {
+        resourcesText += '\n\n=== SYSTEM NOTE ===\nThe AI is authorized to use external general knowledge to complete this task.';
+      }
 
       const res = await fetch('/api/generate-answer', {
         method: 'POST',
@@ -76,6 +145,8 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
       
       if (data.answer) {
         setAiAnswer(data.answer);
+        // Save the AI answer to the schedule so it can be harvested
+        schedule.aiAnswer = data.answer;
       } else {
         setAiAnswer('Error: Empty response from AI.');
       }
@@ -94,6 +165,7 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
       
       if (remaining === 0) {
         clearInterval(timer);
+        localStorage.removeItem(`lockscreen_data_${schedule.id}`);
         onTimeout();
       }
     }, 1000);
@@ -114,7 +186,7 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
     try {
       const formData = new FormData();
       formData.append('document', file);
-      formData.append('type', 'homework');
+      formData.append('type', 'transcription');
       
       const headers: Record<string, string> = {};
       if (settings.apiKey) headers['x-api-key'] = settings.apiKey;
@@ -129,7 +201,15 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
         body: formData
       });
       
-      const data = await res.json();
+      
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 100)}`);
+      }
+
       if (res.ok && !data.error) {
         setTranscribedText(data.content);
       } else {
@@ -161,6 +241,7 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
   
   const handleSubmit = () => {
     if (selectedFile) {
+      // NOTE: We no longer clear localStorage here. It is cleared in App.tsx ONLY if evaluation passes.
       onSubmitHomework(selectedFile, ocrType, transcribedText || undefined);
     }
   };
@@ -180,14 +261,14 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
       <div className="max-w-3xl w-full flex flex-col items-center relative">
         <div className="absolute top-0 right-0 flex gap-2">
           <button 
-            onClick={handleGetAnswer}
+            onClick={() => handleGetAnswer(false)}
             className="px-4 py-2 bg-indigo-900 hover:bg-indigo-800 text-xs text-indigo-300 font-bold rounded-lg transition-colors flex items-center"
           >
             <Sparkles className="w-3 h-3 mr-2" />
             Get AI Answer
           </button>
           <button 
-            onClick={() => onTimeout(true)}
+            onClick={() => { localStorage.removeItem(`lockscreen_data_${schedule.id}`); onTimeout(true); }}
             className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-xs text-gray-400 font-bold rounded-lg transition-colors"
           >
             Skip Lock (Test)
@@ -253,14 +334,30 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
         <div className="w-full bg-gray-900 border border-gray-800 rounded-2xl p-8 flex flex-col items-center">
           <div className="w-full flex justify-between items-center mb-4">
             <h4 className="text-gray-400 font-medium">Upload Submission</h4>
-            <select
-              value={ocrType}
-              onChange={(e) => setOcrType(e.target.value as 'simple' | 'formatted')}
-              className="bg-gray-800 text-sm text-gray-300 px-3 py-1.5 rounded-lg border border-gray-700 focus:outline-none focus:border-gray-500"
-            >
-              <option value="simple">Simple OCR</option>
-              <option value="formatted">Formatted OCR (Tables)</option>
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={settings.apiModel || 'gemini-3.7-flash'}
+                onChange={(e) => onSettingsChange?.({ apiModel: e.target.value })}
+                className="bg-gray-800 text-sm text-gray-300 px-3 py-1.5 rounded-lg border border-gray-700 focus:outline-none focus:border-gray-500"
+              >
+                <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+                <option value="gemini-3.7-pro">Gemini 3.7 Pro</option>
+                <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                <option value="gemini-3.5-pro">Gemini 3.5 Pro</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
+              </select>
+              <select
+                value={ocrType}
+                onChange={(e) => setOcrType(e.target.value as 'simple' | 'formatted')}
+                className="bg-gray-800 text-sm text-gray-300 px-3 py-1.5 rounded-lg border border-gray-700 focus:outline-none focus:border-gray-500"
+              >
+                <option value="simple">Simple OCR</option>
+                <option value="formatted">Formatted OCR (Tables)</option>
+              </select>
+            </div>
           </div>
           {!previewUrl ? (
             <div 
@@ -335,6 +432,35 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
             onChange={handleFileChange}
           />
         </div>
+        
+        {(settings.allowedApps && settings.allowedApps.length > 0) && (
+          <div className="w-full bg-gray-900 border border-gray-800 rounded-2xl p-6 mt-8">
+            <h4 className="text-gray-500 font-bold uppercase text-xs mb-4 flex items-center justify-center">
+              <LayoutGrid className="w-4 h-4 mr-2" /> Allowed Applications During Lock
+            </h4>
+            <div className="flex flex-wrap justify-center gap-3">
+              {settings.allowedApps.map(app => {
+                const iconMap: Record<string, React.ElementType> = {
+                  'Calculator': Calculator,
+                  'FileText': FileText,
+                  'Music': Music,
+                  'Globe': Globe,
+                  'BookOpen': BookOpen,
+                  'MessageSquare': MessageSquare,
+                  'MonitorPlay': MonitorPlay
+                };
+                const RenderIcon = iconMap[app.iconName] || LayoutGrid;
+                
+                return (
+                  <div key={app.id} className="flex items-center bg-black/40 border border-gray-800 rounded-xl py-2 px-4 shadow-sm">
+                    <RenderIcon className="w-5 h-5 text-gray-400 mr-2" />
+                    <span className="text-sm font-semibold text-gray-300">{app.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {showAnswerPopup && (
@@ -359,7 +485,14 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
                 <div className="whitespace-pre-wrap">{aiAnswer}</div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-gray-800 bg-black/20 flex justify-end">
+            <div className="px-6 py-4 border-t border-gray-800 bg-black/20 flex justify-end space-x-3">
+              <button 
+                onClick={() => handleGetAnswer(true)}
+                disabled={isGeneratingAnswer}
+                className="px-6 py-2 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 font-bold rounded-xl transition-colors disabled:opacity-50"
+              >
+                Retry
+              </button>
               <button 
                 onClick={() => setShowAnswerPopup(false)}
                 className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl transition-colors"

@@ -81,32 +81,31 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
       });
       
       const rawText = await res.text();
-      let data: Record<string, unknown> = {};
+      let data: any = {};
       try {
-        data = JSON.parse(rawText) as Record<string, unknown>;
-      } catch (error) {
+        data = JSON.parse(rawText);
+      } catch (e) {
         if (!res.ok) {
           throw new Error(`Server error (${res.status})`);
+        } else {
+          throw new Error(`Unexpected response format from server.`);
         }
-        throw new Error('Unexpected response format from server.');
       }
 
       if (!res.ok) {
-        throw new Error(typeof data.error === 'string' ? data.error : 'Failed to refine prompt.');
+        throw new Error(data.error || 'Failed to refine prompt.');
       }
 
-      const refined = typeof data.refined === 'string' ? data.refined : '';
-      if (refined) {
-        const newPrompts = { ...customPrompts, [key]: refined };
+      if (data.refined) {
+        const newPrompts = { ...customPrompts, [key]: data.refined };
         setCustomPrompts(newPrompts);
         onSave({ prompts: newPrompts });
       } else {
         throw new Error('Refined prompt is empty.');
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to refine prompt', key, error);
-      alert('Failed to refine prompt: ' + message);
+    } catch (e: any) {
+      console.error('Failed to refine prompt', key, e);
+      alert('Failed to refine prompt: ' + (e.message || 'Unknown error'));
     } finally {
       setRefiningKey(null);
     }
@@ -194,7 +193,6 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
                 </label>
                 <select
                   value={apiModel}
-                  disabled={hasActiveSchedule}
                   onChange={(e) => setApiModel(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-red-500 text-sm mb-2"
                 >
@@ -261,7 +259,6 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
               <div className="flex space-x-3 mt-8">
                 <button
                   onClick={handleClearGeneral}
-                  disabled={hasActiveSchedule}
                   className="px-6 py-3 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl flex items-center transition-colors flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
@@ -269,7 +266,6 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
                 </button>
                 <button
                   onClick={handleSaveGeneral}
-                  disabled={hasActiveSchedule}
                   className="px-6 py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-xl shadow-lg flex items-center transition-colors flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save className="w-4 h-4 mr-2" />
@@ -283,15 +279,8 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
             <div className="max-w-5xl mx-auto">
               <div className="flex justify-between items-center mb-6">
                 <p className="text-sm text-gray-600 leading-relaxed max-w-xl">
-                  Customize the system prompts used across the application. You can automatically refine and structure individual prompts, or manually save your edits.
+                  View the system prompts used across the application. These prompts are hardcoded and cannot be modified from the UI.
                 </p>
-                <button
-                  onClick={handleResetAllPrompts}
-                  className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl flex items-center transition-colors text-sm"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Reset All to Defaults
-                </button>
               </div>
               
               <div className="space-y-8">
@@ -301,44 +290,12 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
                       <h3 className="font-bold text-gray-800 text-sm font-mono">{key}</h3>
                     </div>
                     <textarea
-                      value={customPrompts[key] !== undefined ? customPrompts[key] : defaultPrompts[key]}
-                      onChange={e => handlePromptChange(key, e.target.value)}
-                      className="w-full h-48 p-4 text-xs font-mono text-gray-700 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      readOnly
+                      value={defaultPrompts[key]}
+                      className="w-full h-48 p-4 text-xs font-mono text-gray-700 bg-white resize-none focus:outline-none focus:ring-0 cursor-text"
                     />
-                    <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-between items-center">
-                      {customPrompts[key] && customPrompts[key] !== defaultPrompts[key] ? (
-                        <button
-                          onClick={() => handleResetPrompt(key)}
-                          className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center px-2 py-1"
-                        >
-                          <RefreshCw className="w-3 h-3 mr-1" />
-                          Revert to Default
-                        </button>
-                      ) : <div />}
-                      <button
-                        onClick={() => handleRefineAndSaveSingle(key)}
-                        disabled={refiningKey === key || customPrompts[key] === defaultPrompts[key] || customPrompts[key] === undefined}
-                        className="px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 disabled:opacity-50 disabled:bg-gray-100 disabled:text-gray-400 text-xs font-bold rounded-lg transition-colors flex items-center"
-                      >
-                        {refiningKey === key ? (
-                          <><Wand2 className="w-3 h-3 mr-2 animate-spin" /> Refining...</>
-                        ) : (
-                          <><Wand2 className="w-3 h-3 mr-2" /> Refine & Save Prompt</>
-                        )}
-                      </button>
-                    </div>
                   </div>
                 ))}
-              </div>
-
-              <div className="sticky bottom-0 bg-white/90 backdrop-blur-md pt-4 pb-2 mt-8 border-t border-gray-100 flex justify-end">
-                <button
-                  onClick={handleSaveAllPrompts}
-                  className="px-6 py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-xl shadow-lg flex items-center transition-colors"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Save
-                </button>
               </div>
             </div>
           )}

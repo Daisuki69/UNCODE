@@ -17,6 +17,14 @@ export interface ScheduleData {
   activationTime: string; // HH:mm
   durationMinutes: number;
   isActive: boolean;
+  userDraft?: string;
+  aiAnswer?: string;
+}
+
+export interface AllowedApp {
+  id: string;
+  name: string;
+  iconName: string;
 }
 
 export interface AppSettings {
@@ -31,6 +39,7 @@ export interface AppSettings {
   defaultOcrType?: 'simple' | 'formatted';
   uiScale?: number;
   uiWidth?: string;
+  allowedApps?: AllowedApp[];
 }
 
 export interface EvaluationResult {
@@ -57,4 +66,14 @@ export interface CompletedHomework {
   feedback: string;
   passed: boolean;
   timestamp: number;
+}
+
+declare global {
+  interface Window {
+    systemLockAPI?: {
+      getInstalledApps: () => Promise<any[]>;
+      startLockdown: (allowedAppIds: string[]) => void;
+      endLockdown: () => void;
+    };
+  }
 }
