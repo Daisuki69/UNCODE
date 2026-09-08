@@ -95,6 +95,8 @@ export function Dashboard({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  const isCurrentResourceLocked = editingResource && editingResource !== 'new' && settings.schedules.some(s => s.isActive && (s.selectedResourceIds || []).includes(editingResource.id));
+
   const formatForInput = (d: Date) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
     return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -279,7 +281,7 @@ export function Dashboard({
           >
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-black text-gray-900">
-            {editingResource === 'new' ? 'Add New Resource' : 'Edit Resource'}
+            {editingResource === 'new' ? 'Add New Resource' : isCurrentResourceLocked ? 'View Resource (Locked)' : 'Edit Resource'}
           </h2>
           <button onClick={() => { setNavDirection('backward'); setEditingResource(null); }} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <X className="w-6 h-6 text-gray-500" />
@@ -333,7 +335,8 @@ export function Dashboard({
               type="text"
               value={newResTitle}
               onChange={(e) => setNewResTitle(e.target.value)}
-              className="w-full p-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 bg-gray-50 text-lg font-medium"
+              disabled={isCurrentResourceLocked}
+              className={`w-full p-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 bg-gray-50 text-lg font-medium ${isCurrentResourceLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
               placeholder="E.g., Chapter 4: Memory Management"
             />
           </div>
@@ -343,14 +346,15 @@ export function Dashboard({
             <textarea
               value={newResContent}
               onChange={(e) => setNewResContent(e.target.value)}
-              className="flex-1 min-h-[300px] w-full p-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 resize-none font-mono text-sm leading-relaxed"
+              disabled={isCurrentResourceLocked}
+              className={`flex-1 min-h-[300px] w-full p-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 resize-none font-mono text-sm leading-relaxed ${isCurrentResourceLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
               required
             />
           </div>
 
           <div className="pt-6 border-t border-gray-100 flex justify-between items-center mt-4">
             <div className="flex items-center gap-4">
-              {editingResource !== 'new' && (
+              {editingResource !== 'new' && !isCurrentResourceLocked && (
                 <>
                   <button
                     type="button"
@@ -380,21 +384,23 @@ export function Dashboard({
                 }}
                 className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors"
               >
-                Cancel
+                {isCurrentResourceLocked ? 'Close' : 'Cancel'}
               </button>
               
-              <button 
-                type="button"
-                onClick={handleSaveAndCleanup}
-                disabled={isDecluttering || (!newResTitle.trim() && !newResContent.trim())}
-                className="px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-colors flex items-center disabled:opacity-50"
-              >
-                {isDecluttering ? (
-                  <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...</>
-                ) : (
-                  <><Sparkles className="w-5 h-5 mr-2" /> Save & Clean Up</>
-                )}
-              </button>
+              {!isCurrentResourceLocked && (
+                <button 
+                  type="button"
+                  onClick={handleSaveAndCleanup}
+                  disabled={isDecluttering || (!newResTitle.trim() && !newResContent.trim())}
+                  className="px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-colors flex items-center disabled:opacity-50"
+                >
+                  {isDecluttering ? (
+                    <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...</>
+                  ) : (
+                    <><Sparkles className="w-5 h-5 mr-2" /> Save & Clean Up</>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </form>
@@ -717,19 +723,15 @@ export function Dashboard({
               <div 
                 key={res.id} 
                 onClick={() => {
-                  if (isLocked) {
-                    showError(`Cannot edit "${res.title}" because it is currently attached to an active schedule. Please pause the schedule first.`);
-                    return;
-                  }
                   openEditResource(res);
                 }}
-                className={`group p-4 bg-white border border-gray-200 rounded-xl transition-all shadow-sm flex items-center justify-between text-left w-full ${isLocked ? 'opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed' : 'hover:border-gray-900 cursor-pointer'}`}
+                className={`group p-4 bg-white border border-gray-200 rounded-xl transition-all shadow-sm flex items-center justify-between text-left w-full cursor-pointer ${isLocked ? 'hover:border-red-300' : 'hover:border-gray-900'}`}
               >
                 <div className="flex items-center">
                   <BookOpen className={`w-5 h-5 mr-3 transition-colors ${isLocked ? 'text-gray-300' : 'text-gray-400 group-hover:text-gray-900'}`} />
                   <h3 className={`font-bold text-base ${isLocked ? 'text-gray-500' : 'text-gray-900'}`}>{res.title}</h3>
                 </div>
-                {isLocked && <div className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded border border-red-100 uppercase tracking-wider flex items-center"><ShieldAlert className="w-3 h-3 mr-1" /> Locked</div>}
+                {isLocked && <div className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded border border-red-100 uppercase tracking-wider flex items-center"><ShieldAlert className="w-3 h-3 mr-1" /> Locked (View Only)</div>}
               </div>
             )})}
           </div>
