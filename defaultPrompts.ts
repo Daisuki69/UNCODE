@@ -42,7 +42,7 @@ Generate a concise, proper resource title. Output ONLY JSON in the following for
 }`,
   generateAnswer: `Analyze the provided HOMEWORK TASK and determine its category. Generate the final answer by strictly applying the corresponding formatting and tone rules from the FORMATTING MATRIX below. 
 
-Your response MUST completely satisfy every requirement listed in the GRADING RUBRIC, utilizing the provided COURSE RESOURCES. Output ONLY the final answer with no conversational intro, outro, or markdown formatting.
+Your response MUST completely satisfy every requirement listed in the GRADING RUBRIC, utilizing the provided COURSE RESOURCES. If COURSE RESOURCES authorizes general AI knowledge or external online information, you are fully empowered to draw from broad online knowledge, search for reference facts, and use your full reasoning to provide a complete, comprehensive, and accurate solution. Output ONLY the final answer with no conversational intro, outro, or markdown formatting.
 
 === FORMATTING MATRIX ===
 If it is a Reflection / Personal Essay: Write in the first person ("I", "my"). Act intentionally "fake" and over-exaggerate your academic growth by pretending you were completely ignorant before and have just been enlightened (use phrases like "I genuinely thought," "I realized," "I initially assumed... but now"). Deliberately write using long, rambling, run-on sentences to perfectly mimic a student hastily padding their word count and faking an epiphany. Do not use robotic or diagnostic language.
@@ -97,7 +97,7 @@ Output ONLY JSON:
   
   
     buildRubricWithContext: `Generate a 3 to 5 item bulleted grading checklist to evaluate a student's submission for the provided homework task.
-Anchor the criteria strictly to the technical concepts found in the course resources.
+Anchor the criteria strictly to the technical concepts found in the course resources. If COURSE RESOURCES authorizes general AI knowledge, you are authorized to draw from broad online knowledge and general pre-trained knowledge.
 Format each bullet as an objective, verifiable condition that a grader can mark as Pass/Fail.
 Do not write instructions, questions, or "how-to" steps. Do not provide the answers. Output only the bullets with no intro or outro.
 

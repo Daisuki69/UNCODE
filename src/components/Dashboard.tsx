@@ -626,6 +626,14 @@ export function Dashboard({
                       <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Attached Resources</h4>
                       <div className="flex flex-wrap gap-2">
                         {schedule.selectedResourceIds.map(resId => {
+                          if (resId === 'ai-general-knowledge') {
+                            return (
+                              <span key="ai-general-knowledge" className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-700 flex items-center shadow-xs">
+                                <Sparkles className="w-3.5 h-3.5 mr-1.5 text-indigo-500" />
+                                🌐 General AI Knowledge
+                              </span>
+                            );
+                          }
                           const res = resources.find(r => r.id === resId);
                           return res ? (
                             <span key={res.id} className="px-2 py-1 bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 flex items-center">

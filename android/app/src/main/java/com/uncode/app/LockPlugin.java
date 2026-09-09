@@ -35,6 +35,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.OutputStream;
 import java.io.InputStream;
+import android.view.accessibility.AccessibilityManager;
+import android.accessibilityservice.AccessibilityServiceInfo;
 
 @CapacitorPlugin(name = "LockPlugin")
 public class LockPlugin extends Plugin {
@@ -170,26 +172,97 @@ public class LockPlugin extends Plugin {
         result.put("isAdminActive", dpm.isAdminActive(adminComponent));
         
         boolean accessibilityEnabled = false;
+
+        // 1. Primary Check: Query active AccessibilityManager services
         try {
-            int enabled = android.provider.Settings.Secure.getInt(
-                getActivity().getContentResolver(),
-                android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 0);
-            if (enabled == 1) {
-                String services = android.provider.Settings.Secure.getString(
-                    getActivity().getContentResolver(),
-                    android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-                if (services != null) {
+            AccessibilityManager am = (AccessibilityManager) getActivity().getSystemService(Context.ACCESSIBILITY_SERVICE);
+            if (am != null) {
+                List<AccessibilityServiceInfo> runningServices = 
+                    am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK);
+                if (runningServices != null) {
                     String pkg = getActivity().getPackageName();
-                    // Android stores services as "com.pkg/com.pkg.ServiceClass" or "com.pkg/.ServiceClass"
-                    // Check for both formats
-                    if (services.contains(pkg + "/") || services.contains("LockAccessibilityService")) {
-                        accessibilityEnabled = true;
+                    for (AccessibilityServiceInfo s : runningServices) {
+                        if (s.getId() != null && s.getId().contains(pkg)) {
+                            accessibilityEnabled = true;
+                            break;
+                        }
                     }
                 }
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            Log.w(TAG, "AccessibilityManager query failed", e);
+        }
+
+        // 2. Secondary Check: Fallback to Settings.Secure
+        if (!accessibilityEnabled) {
+            try {
+                int enabled = android.provider.Settings.Secure.getInt(
+                    getActivity().getContentResolver(),
+                    android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 0);
+                if (enabled == 1) {
+                    String services = android.provider.Settings.Secure.getString(
+                        getActivity().getContentResolver(),
+                        android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+                    if (services != null) {
+                        String pkg = getActivity().getPackageName();
+                        if (services.contains(pkg + "/") || services.contains("LockAccessibilityService")) {
+                            accessibilityEnabled = true;
+                        }
+                    }
+                }
+            } catch (Exception e) {}
+        }
         
         result.put("isAccessibilityEnabled", accessibilityEnabled);
+
+        // 3. Detect Installation Source (ADB vs On-Device Package Installer)
+        String installSource = "On-Device Package Installer";
+        boolean isAdbInstall = false;
+        try {
+            PackageManager pm = getActivity().getPackageManager();
+            String installer = null;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                android.content.pm.InstallSourceInfo info = pm.getInstallSourceInfo(getActivity().getPackageName());
+                if (info != null) {
+                    installer = info.getInstallingPackageName();
+                    if (installer == null) {
+                        installer = info.getInitiatingPackageName();
+                    }
+                }
+            } else {
+                installer = pm.getInstallerPackageName(getActivity().getPackageName());
+            }
+
+            // Sideload via ADB has null or "com.android.shell" installer
+            if (installer == null || "com.android.shell".equals(installer)) {
+                isAdbInstall = true;
+                installSource = "ADB (PC Script / USB)";
+            } else if (installer.contains("vending")) {
+                installSource = "Google Play Store";
+            } else if (installer.contains("packageinstaller")) {
+                installSource = "On-Device Package Installer";
+            } else {
+                installSource = "Installer: " + installer;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to query installer info", e);
+        }
+
+        // Check intent extra or prefs from qiezka.bat
+        try {
+            Intent launchIntent = getActivity().getIntent();
+            if (launchIntent != null && "adb".equals(launchIntent.getStringExtra("setup_source"))) {
+                isAdbInstall = true;
+                installSource = "ADB (PC Script / USB)";
+                prefs.edit().putBoolean("configured_via_adb", true).apply();
+            } else if (prefs.getBoolean("configured_via_adb", false)) {
+                isAdbInstall = true;
+                installSource = "ADB (PC Script / USB)";
+            }
+        } catch (Exception e) {}
+
+        result.put("isAdbInstall", isAdbInstall);
+        result.put("installSource", installSource);
 
         boolean isBatteryIgnored = false;
         try {

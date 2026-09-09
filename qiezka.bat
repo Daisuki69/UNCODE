@@ -7,8 +7,8 @@ title QIEZKA Setup and Permissions Tool
 ::  Edit the values below (true or false) to tailor the setup to your needs.
 :: ============================================================================
 
-:: 1. Force re-install local APK even if already installed on device (default: false)
-set "FORCE_REINSTALL_APK=false"
+:: 1. Re-install/update local APK on device (default: true, keeps existing data)
+set "FORCE_REINSTALL_APK=true"
 
 :: 2. Unlock Android 13/14+ Restricted Settings automatically via ADB
 set "BYPASS_RESTRICTED_SETTINGS=true"
@@ -85,12 +85,14 @@ if not "!APP_INSTALLED!"=="" (
 )
 
 :do_install
-echo       QIEZKA is not installed on your phone yet.
+echo       Preparing QIEZKA APK installation/update...
 echo       Searching for local APK to install...
 
 set "APK_PATH="
 if exist "%PROJECT_DIR%android\app\build\outputs\apk\debug\app-debug.apk" (
     set "APK_PATH=%PROJECT_DIR%android\app\build\outputs\apk\debug\app-debug.apk"
+) else if exist "%PROJECT_DIR%android\app\build\outputs\apk\debug\qiezka.apk" (
+    set "APK_PATH=%PROJECT_DIR%android\app\build\outputs\apk\debug\qiezka.apk"
 ) else if exist "%PROJECT_DIR%qiezka.apk" (
     set "APK_PATH=%PROJECT_DIR%qiezka.apk"
 ) else if exist "%PROJECT_DIR%app-debug.apk" (
@@ -158,8 +160,18 @@ echo.
 :: [5/6] Automatic Accessibility Service enablement via ADB
 if /i "!ENABLE_ACCESSIBILITY!"=="true" (
     echo [5/6] Enabling Accessibility Service automatically...
-    adb.exe shell "settings put secure enabled_accessibility_services com.uncode.app/com.uncode.app.LockAccessibilityService:com.uncode.app/.LockAccessibilityService" >nul 2>&1
-    adb.exe shell "settings put secure accessibility_enabled 1" >nul 2>&1
+    adb.exe shell settings put secure accessibility_enabled 1 >nul 2>&1
+    set "CURR_SVCS="
+    for /f "tokens=*" %%s in ('adb.exe shell settings get secure enabled_accessibility_services 2^>nul') do set "CURR_SVCS=%%s"
+    if "!CURR_SVCS!"=="null" set "CURR_SVCS="
+    echo !CURR_SVCS! | findstr /c:"com.uncode.app" >nul
+    if errorlevel 1 (
+        if "!CURR_SVCS!"=="" (
+            adb.exe shell settings put secure enabled_accessibility_services com.uncode.app/com.uncode.app.LockAccessibilityService >nul 2>&1
+        ) else (
+            adb.exe shell settings put secure enabled_accessibility_services "!CURR_SVCS!:com.uncode.app/com.uncode.app.LockAccessibilityService" >nul 2>&1
+        )
+    )
     echo       Accessibility Service enabled.
 ) else (
     echo [5/6] Accessibility Service: SKIPPED [Configured: false].
@@ -197,7 +209,7 @@ echo.
 :: Launch QIEZKA
 if /i "!LAUNCH_APP_ON_FINISH!"=="true" (
     echo Launching QIEZKA...
-    adb.exe shell am start -n com.uncode.app/.MainActivity >nul 2>&1
+    adb.exe shell am start -n com.uncode.app/.MainActivity --es setup_source adb >nul 2>&1
     echo.
 )
 

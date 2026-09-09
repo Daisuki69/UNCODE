@@ -25,7 +25,10 @@ export function EditRubric({ schedule, resources, apiKey, apiModel, role, onSave
   const handleGenerateRubric = async () => {
     setIsGeneratingRubric(true);
     try {
-      const resourcesText = resources.filter(r => schedule.selectedResourceIds.includes(r.id)).map(r => `=== ${r.title} ===\n${r.content}`).join('\n\n');
+      let resourcesText = resources.filter(r => (schedule.selectedResourceIds || []).includes(r.id)).map(r => `=== ${r.title} ===\n${r.content}`).join('\n\n');
+      if ((schedule.selectedResourceIds || []).includes('ai-general-knowledge')) {
+        resourcesText += '\n\n=== SYSTEM NOTE ===\nThe AI is authorized to use external general knowledge to complete this task.';
+      }
       const rubric = await buildRubric({
         content: schedule.homeworkContent,
         resourcesText,
@@ -49,7 +52,10 @@ export function EditRubric({ schedule, resources, apiKey, apiModel, role, onSave
 
     setIsRefiningRubric(true);
     try {
-      const resourcesText = resources.filter(r => schedule.selectedResourceIds.includes(r.id)).map(r => r.content).join('\n\n');
+      let resourcesText = resources.filter(r => (schedule.selectedResourceIds || []).includes(r.id)).map(r => r.content).join('\n\n');
+      if ((schedule.selectedResourceIds || []).includes('ai-general-knowledge')) {
+        resourcesText += '\n\n=== SYSTEM NOTE ===\nThe AI is authorized to use external general knowledge to complete this task.';
+      }
       const rubric = await buildRubric({
         content: schedule.homeworkContent,
         resourcesText,

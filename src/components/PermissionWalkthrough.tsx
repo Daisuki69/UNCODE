@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { ShieldAlert, Settings, CheckCircle, Loader2, Terminal, ExternalLink, Copy, Check, ShieldCheck, Smartphone, Laptop, AlertTriangle, Info, ArrowRight, ListFilter, BatteryCharging, Bell } from 'lucide-react';
+import { ShieldAlert, Settings, CheckCircle, Loader2, Terminal, ExternalLink, Copy, Check, ShieldCheck, Smartphone, Laptop, AlertTriangle, Info, ArrowRight, ListFilter, BatteryCharging, Bell, CheckCircle2, XCircle } from 'lucide-react';
 import { checkPermissions, openAccessibilitySettings, openDeviceAdminSettings, openDeviceAdminList, openAppInfo, requestBatteryOptimization, requestNotificationPermission } from '../systemBridge';
 
 interface PermissionWalkthroughProps {
@@ -12,18 +12,24 @@ export function PermissionWalkthrough({ onComplete }: PermissionWalkthroughProps
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'device' | 'pc'>('device');
   const [showRestrictedHelp, setShowRestrictedHelp] = useState(false);
+  const tabInitialized = useRef(false);
+
   const [perms, setPerms] = useState<{
     isAccessibilityEnabled: boolean;
     isAdminActive: boolean;
     isDeviceOwner: boolean;
     isBatteryOptimizationIgnored: boolean;
     isNotificationGranted: boolean;
+    isAdbInstall?: boolean;
+    installSource?: string;
   }>({
     isAccessibilityEnabled: false,
     isAdminActive: false,
     isDeviceOwner: false,
     isBatteryOptimizationIgnored: false,
     isNotificationGranted: false,
+    isAdbInstall: false,
+    installSource: undefined,
   });
 
   const gitHubUrl = 'https://github.com/Daisuki69/uncode';
@@ -32,6 +38,10 @@ export function PermissionWalkthrough({ onComplete }: PermissionWalkthroughProps
     setIsChecking(true);
     const result = await checkPermissions();
     setPerms(result);
+    if (!tabInitialized.current) {
+      setActiveTab(result.isAdbInstall ? 'pc' : 'device');
+      tabInitialized.current = true;
+    }
     setIsChecking(false);
   };
 
@@ -70,9 +80,35 @@ export function PermissionWalkthrough({ onComplete }: PermissionWalkthroughProps
         
         <h2 className="text-2xl font-black mb-2 tracking-wide text-white uppercase">Setup Permissions</h2>
         
-        <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+        <p className="text-gray-400 text-sm mb-4 leading-relaxed">
           Configure permissions to enforce lock sessions and protect against uninstallation.
         </p>
+
+        {/* Installation Source Banner */}
+        <div className="w-full mb-5 px-3.5 py-2.5 rounded-2xl border flex items-center justify-between text-xs bg-gray-950/80 border-gray-800">
+          <div className="flex items-center gap-2.5 text-left">
+            {perms.isAdbInstall ? (
+              <div className="w-7 h-7 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                <Terminal className="w-4 h-4 text-emerald-400" />
+              </div>
+            ) : (
+              <div className="w-7 h-7 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center">
+                <Smartphone className="w-4 h-4 text-sky-400" />
+              </div>
+            )}
+            <div>
+              <span className="text-[10px] uppercase font-bold text-gray-500 block leading-none mb-0.5">Installed via</span>
+              <span className="font-bold text-gray-200 text-xs">
+                {perms.installSource || (perms.isAdbInstall ? 'ADB (PC Script / USB)' : 'On-Device Package Installer')}
+              </span>
+            </div>
+          </div>
+          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+            perms.isAdbInstall ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-sky-950 text-sky-300 border border-sky-800'
+          }`}>
+            {perms.isAdbInstall ? 'ADB Provisioned' : 'On-Device'}
+          </span>
+        </div>
 
         {/* Permission Status Badges (2x2 Grid) */}
         <div className="w-full grid grid-cols-2 gap-2 mb-6">
@@ -125,26 +161,7 @@ export function PermissionWalkthrough({ onComplete }: PermissionWalkthroughProps
           </div>
         </div>
 
-        {/* Method Tabs */}
-        <div className="w-full flex bg-gray-950 p-1 rounded-xl border border-gray-800 mb-6">
-          <button
-            type="button"
-            onClick={() => setActiveTab('device')}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activeTab === 'device' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
-          >
-            <Smartphone className="w-4 h-4" />
-            <span>On Device</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('pc')}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activeTab === 'pc' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
-          >
-            <Laptop className="w-4 h-4" />
-            <span>PC Script (qiezka.bat)</span>
-          </button>
-        </div>
-
+        {/* Setup Flow (Auto-detected based on install source) */}
         {activeTab === 'device' ? (
           <div className="w-full flex flex-col gap-4 mb-6">
             {/* Restricted Settings Notice (Android 13+) */}
@@ -293,27 +310,173 @@ export function PermissionWalkthrough({ onComplete }: PermissionWalkthroughProps
             </div>
           </div>
         ) : (
-          <div className="w-full bg-black/40 border border-gray-800 rounded-2xl p-5 mb-6 text-left flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+          <div className="w-full bg-black/40 border border-gray-800 rounded-2xl p-4 sm:p-5 mb-6 text-left flex flex-col gap-3">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-2.5">
               <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Terminal className="w-4 h-4" /> Automated Setup via ADB
+                <Terminal className="w-4 h-4 text-emerald-400" /> ADB Provisioning Status
+              </span>
+              <span className="text-[10px] text-gray-400 font-mono">
+                {perms.isAdbInstall ? 'PC Script Detected' : 'Manual ADB'}
               </span>
             </div>
 
             <p className="text-xs text-gray-300 leading-relaxed">
-              Connect your phone via USB with <strong>USB Debugging</strong> enabled, then run <code className="text-amber-300 bg-black/60 px-1 py-0.5 rounded font-mono">qiezka.bat</code> to grant all permissions and bypass restricted settings automatically.
+              {perms.isAdbInstall ? (
+                <>QIEZKA detected setup via <strong>ADB / PC script</strong>. Below is what has been configured on your device:</>
+              ) : (
+                <>Connect your phone via USB with <strong>USB Debugging</strong> enabled, then run <code className="text-amber-300 bg-black/60 px-1 py-0.5 rounded font-mono">qiezka.bat</code> to grant all permissions automatically.</>
+              )}
             </p>
 
-            <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 flex items-center justify-between font-mono text-xs">
-              <span className="text-gray-300 truncate mr-2">{gitHubUrl}</span>
+            {/* ADB Checklist */}
+            <div className="flex flex-col gap-2 my-1">
+              {/* 1. Accessibility */}
+              <div className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                perms.isAccessibilityEnabled ? 'bg-emerald-950/20 border-emerald-800/60' : 'bg-red-950/20 border-red-800/60'
+              }`}>
+                <div className="flex flex-col text-left pr-2">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Settings className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="font-bold text-xs text-gray-200">1. App Blocking (Accessibility)</span>
+                  </div>
+                  <span className="text-[11px] text-gray-400">
+                    {perms.isAccessibilityEnabled 
+                      ? 'Active: Intercepts distracting apps & collapses Quick Settings.' 
+                      : 'Not enabled yet. Tap below to turn on in Accessibility Settings.'}
+                  </span>
+                </div>
+                {perms.isAccessibilityEnabled ? (
+                  <span className="px-2 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-lg text-[10px] font-bold flex items-center gap-1 shrink-0">
+                    <Check className="w-3 h-3" /> Granted
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openAccessibilitySettings()}
+                    className="px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold shrink-0 transition shadow"
+                  >
+                    Enable Now
+                  </button>
+                )}
+              </div>
+
+              {/* 2. Device Admin */}
+              <div className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                perms.isAdminActive ? 'bg-emerald-950/20 border-emerald-800/60' : 'bg-gray-900 border-gray-800'
+              }`}>
+                <div className="flex flex-col text-left pr-2">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="font-bold text-xs text-gray-200">2. Device Administrator</span>
+                  </div>
+                  <span className="text-[11px] text-gray-400">
+                    {perms.isAdminActive ? 'Active: Prevents uninstallation during active locks.' : 'Inactive: Tap to activate device admin prompt.'}
+                  </span>
+                </div>
+                {perms.isAdminActive ? (
+                  <span className="px-2 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-lg text-[10px] font-bold flex items-center gap-1 shrink-0">
+                    <Check className="w-3 h-3" /> Active
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openDeviceAdminSettings()}
+                    className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shrink-0 transition shadow"
+                  >
+                    Activate
+                  </button>
+                )}
+              </div>
+
+              {/* 3. Battery Saver */}
+              <div className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                perms.isBatteryOptimizationIgnored ? 'bg-emerald-950/20 border-emerald-800/60' : 'bg-gray-900 border-gray-800'
+              }`}>
+                <div className="flex flex-col text-left pr-2">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <BatteryCharging className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="font-bold text-xs text-gray-200">3. Battery Saver Whitelist</span>
+                  </div>
+                  <span className="text-[11px] text-gray-400">
+                    {perms.isBatteryOptimizationIgnored ? 'Whitelisted: Safe from aggressive OEM task killers.' : 'Pending: Tap to exempt from battery saver.'}
+                  </span>
+                </div>
+                {perms.isBatteryOptimizationIgnored ? (
+                  <span className="px-2 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-lg text-[10px] font-bold flex items-center gap-1 shrink-0">
+                    <Check className="w-3 h-3" /> Whitelisted
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await requestBatteryOptimization();
+                      setTimeout(verifyPermissions, 1000);
+                    }}
+                    className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold shrink-0 transition shadow"
+                  >
+                    Whitelist
+                  </button>
+                )}
+              </div>
+
+              {/* 4. Notification Alerts */}
+              <div className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                perms.isNotificationGranted ? 'bg-emerald-950/20 border-emerald-800/60' : 'bg-gray-900 border-gray-800'
+              }`}>
+                <div className="flex flex-col text-left pr-2">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Bell className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="font-bold text-xs text-gray-200">4. Notification Alerts</span>
+                  </div>
+                  <span className="text-[11px] text-gray-400">
+                    {perms.isNotificationGranted ? 'Granted via ADB pm grant.' : 'Pending: Tap to grant notification access.'}
+                  </span>
+                </div>
+                {perms.isNotificationGranted ? (
+                  <span className="px-2 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-lg text-[10px] font-bold flex items-center gap-1 shrink-0">
+                    <Check className="w-3 h-3" /> Granted
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await requestNotificationPermission();
+                      setTimeout(verifyPermissions, 1000);
+                    }}
+                    className="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold shrink-0 transition shadow"
+                  >
+                    Allow
+                  </button>
+                )}
+              </div>
+
+              {/* 5. Restricted Settings */}
+              <div className="p-3 rounded-xl border flex items-center justify-between bg-emerald-950/20 border-emerald-800/60">
+                <div className="flex flex-col text-left pr-2">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="font-bold text-xs text-gray-200">5. Android 13/14+ Restricted Settings</span>
+                  </div>
+                  <span className="text-[11px] text-gray-400">Bypassed via ADB AppOps (no 3-dot menu needed)</span>
+                </div>
+                <span className="px-2 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-lg text-[10px] font-bold flex items-center gap-1 shrink-0">
+                  <Check className="w-3 h-3" /> Bypassed
+                </span>
+              </div>
+            </div>
+
+            {/* Quick ADB Copy Command / Re-run */}
+            <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 flex items-center justify-between font-mono text-xs mt-1">
+              <span className="text-gray-400 truncate mr-2 font-mono text-[11px]">Need to re-run? Use qiezka.bat</span>
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
-                  onClick={() => copyToClipboard(gitHubUrl)}
-                  className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
-                  title="Copy Repo URL"
+                  onClick={() => copyToClipboard('adb shell settings put secure enabled_accessibility_services com.uncode.app/com.uncode.app.LockAccessibilityService && adb shell settings put secure accessibility_enabled 1')}
+                  className="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-[11px] font-sans font-bold transition flex items-center gap-1"
+                  title="Copy ADB Accessibility Command"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copied ? 'Copied' : 'Copy ADB Cmd'}</span>
                 </button>
                 <a
                   href={gitHubUrl}
@@ -326,12 +489,6 @@ export function PermissionWalkthrough({ onComplete }: PermissionWalkthroughProps
                 </a>
               </div>
             </div>
-
-            <ol className="text-xs text-gray-400 list-decimal list-inside space-y-1 mt-1">
-              <li>Download or clone the repo from GitHub.</li>
-              <li>Connect your phone to your PC via USB.</li>
-              <li>Double-click <strong className="text-white">qiezka.bat</strong> to run.</li>
-            </ol>
           </div>
         )}
 
@@ -354,6 +511,30 @@ export function PermissionWalkthrough({ onComplete }: PermissionWalkthroughProps
               <ArrowRight className="w-4 h-4" />
             </button>
           )}
+        </div>
+
+        {/* Having trouble? Switch Setup Flow at the Bottom */}
+        <div className="w-full pt-4 mt-2 border-t border-gray-800/80 flex flex-col items-center">
+          <p className="text-xs text-gray-400 mb-2">
+            Having trouble with {activeTab === 'pc' ? 'ADB / PC script setup' : 'on-device settings'}?
+          </p>
+          <button
+            type="button"
+            onClick={() => setActiveTab(activeTab === 'pc' ? 'device' : 'pc')}
+            className="px-4 py-2 bg-gray-800/80 hover:bg-gray-800 text-gray-300 hover:text-white border border-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
+          >
+            {activeTab === 'pc' ? (
+              <>
+                <Smartphone className="w-3.5 h-3.5 text-sky-400" />
+                <span>Switch to On-Device 4-Step Setup</span>
+              </>
+            ) : (
+              <>
+                <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Switch to Automated PC Script Setup</span>
+              </>
+            )}
+          </button>
         </div>
       </motion.div>
     </div>

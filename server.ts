@@ -266,11 +266,35 @@ const app = express();
       const ai = new GoogleGenAI({ apiKey: apiKey });
       const prompt = getPrompt(req, 'generateAnswer', { CONTENT: content, RESOURCES_TEXT: resourcesText, RUBRIC_SECTION: rubric ? `=== RUBRIC ===\n${rubric}\n` : '' });
 
-      const response = await ai.models.generateContent({
-        model: apiModel,
-        contents: prompt,
-        config: { temperature: 0.3 }
-      });
+      const hasGeneralKnowledge = resourcesText && (
+        resourcesText.includes('SYSTEM NOTE') || 
+        resourcesText.includes('external general knowledge')
+      );
+
+      const config: any = { temperature: 0.3 };
+      if (hasGeneralKnowledge) {
+        config.tools = [{ googleSearch: {} }];
+      }
+
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model: apiModel,
+          contents: prompt,
+          config
+        });
+      } catch (err: any) {
+        if (config.tools) {
+          delete config.tools;
+          response = await ai.models.generateContent({
+            model: apiModel,
+            contents: prompt,
+            config
+          });
+        } else {
+          throw err;
+        }
+      }
       res.json({ answer: response.text });
     } catch (error) {
       let errMsg = error.message;

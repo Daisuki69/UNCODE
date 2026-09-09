@@ -36,6 +36,8 @@ const LockPlugin = registerPlugin<LockPluginInterface>('LockPlugin', {
       isAdminActive: true,
       isBatteryOptimizationIgnored: true,
       isNotificationGranted: true,
+      isAdbInstall: true,
+      installSource: 'ADB (PC Script / USB)',
     }), // Mock true for web dev
     openAccessibilitySettings: async () => console.log('[Dev] Opening Accessibility Settings'),
     openDeviceAdminSettings: async () => console.log('[Dev] Opening Device Admin Settings'),
@@ -63,6 +65,8 @@ export const checkPermissions = async (): Promise<{
   isAdminActive: boolean;
   isBatteryOptimizationIgnored: boolean;
   isNotificationGranted: boolean;
+  isAdbInstall?: boolean;
+  installSource?: string;
 }> => {
   try {
     return await LockPlugin.checkPermissions();
@@ -74,6 +78,8 @@ export const checkPermissions = async (): Promise<{
       isAdminActive: false,
       isBatteryOptimizationIgnored: false,
       isNotificationGranted: false,
+      isAdbInstall: false,
+      installSource: 'Unknown',
     };
   }
 };

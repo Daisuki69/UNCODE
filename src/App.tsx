@@ -315,10 +315,12 @@ export default function App() {
   const handleTimeout = useCallback((skipped?: boolean) => {
     endLockdown(); // Always release native lock if timer runs out or is skipped
     notifyUser(skipped ? 'Lock skipped (Test mode)' : 'Lock duration expired. Device access restored.');
-    if (skipped && activeScheduleId) {
+    if (activeScheduleId) {
       setSettings(prev => ({
         ...prev,
-        schedules: (prev.schedules || []).filter(s => s.id !== activeScheduleId)
+        schedules: skipped
+          ? (prev.schedules || []).filter(s => s.id !== activeScheduleId)
+          : (prev.schedules || []).map(s => s.id === activeScheduleId ? { ...s, isActive: false } : s)
       }));
     }
     navigate('dashboard', 'backward');
@@ -436,6 +438,7 @@ export default function App() {
 
         // Only clean up the lockscreen data if the student passed
         localStorage.removeItem(`lockscreen_data_${scheduleId}`);
+        localStorage.removeItem('lockscreen_last_draft');
         endLockdown(); // Release the OS lock!
         navigate('result');
       } else {

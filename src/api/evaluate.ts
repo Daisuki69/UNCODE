@@ -34,27 +34,52 @@ export async function evaluate(opts: EvaluateOptions): Promise<EvaluationResult>
   const ai = getGeminiClient(apiKey);
   const promptText = getPrompt('evaluateHomework', { RESOURCES: rubric }, customPrompts);
 
-  const response = await ai.models.generateContent({
-    model: apiModel || 'gemini-2.0-flash',
-    contents: [{
-      role: 'user',
-      parts: [
-        { text: promptText },
-        { text: `[Extracted Homework Answer]:\n${transcribedText}\n\n[System Metrics]:\n- Word Count: ${wordCount}\n- Sentence Count: ${sentenceCount}` },
-      ],
-    }],
-    config: { responseMimeType: 'application/json', temperature: 0.1 },
-  });
+  const preferredModel = apiModel || 'gemini-2.0-flash';
+  const candidateModels = Array.from(new Set([
+    preferredModel,
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-2.5-pro',
+  ]));
 
-  const textOutput = response.text ?? '{}';
-  const cleaned = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-  const result = JSON.parse(cleaned);
+  let lastError: any = null;
+  for (const model of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: promptText },
+            { text: `[Extracted Homework Answer]:\n${transcribedText}\n\n[System Metrics]:\n- Word Count: ${wordCount}\n- Sentence Count: ${sentenceCount}` },
+          ],
+        }],
+        config: { responseMimeType: 'application/json', temperature: 0.1 },
+      });
 
-  return {
-    passed: result.passed ?? false,
-    feedback: result.feedback ?? '',
-    transcribedText,
-    wordCount,
-    sentenceCount,
-  };
+      const textOutput = response.text ?? '{}';
+      const cleaned = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+      const result = JSON.parse(cleaned);
+
+      return {
+        passed: result.passed ?? false,
+        feedback: result.feedback ?? '',
+        transcribedText,
+        wordCount,
+        sentenceCount,
+      };
+    } catch (err: any) {
+      lastError = err;
+      const errMsg = (err?.message || '').toLowerCase();
+      const isRateLimit = errMsg.includes('429') || errMsg.includes('resource_exhausted') || errMsg.includes('quota');
+      if (isRateLimit || errMsg.includes('not found') || errMsg.includes('404')) {
+        console.warn(`Model ${model} returned error (${err?.message}). Attempting fallback to next model in cascade...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw new Error(`Rate limit exceeded on all available Gemini models. ${lastError?.message || 'Please wait for your quota to reset or let the lock timer expire to access Settings.'}`);
 }

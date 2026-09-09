@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Upload, Camera, FileWarning, CheckCircle, Sparkles, X, Loader2, RefreshCcw, Calculator, FileText, Music, Globe, MessageSquare, MonitorPlay, BookOpen, LayoutGrid } from 'lucide-react';
+import { Lock, Upload, Camera, FileWarning, CheckCircle, Sparkles, X, Loader2, RefreshCcw, Calculator, FileText, Music, Globe, MessageSquare, MonitorPlay, BookOpen, LayoutGrid, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ScheduleData, AppSettings, SavedResource } from '../types';
 import { parseResource } from '../api/parseResource';
 import { generateAnswer } from '../api/generateAnswer';
+import { endLockdown } from '../systemBridge';
 
 interface LockScreenProps {
   schedule: ScheduleData;
@@ -31,14 +32,16 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
   
   const [transcribedText, setTranscribedText] = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
 
   const [ocrType, setOcrType] = useState<'simple' | 'formatted'>(settings.defaultOcrType || 'simple');
+  const [showUploadPicker, setShowUploadPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Load from local storage on mount
   useEffect(() => {
-    const savedData = localStorage.getItem(`lockscreen_data_${schedule.id}`);
+    const savedData = localStorage.getItem(`lockscreen_data_${schedule.id}`) || localStorage.getItem('lockscreen_last_draft');
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
@@ -85,13 +88,16 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
       };
       
       if (!transcribedText && !selectedFile) {
-         localStorage.removeItem(`lockscreen_data_${schedule.id}`);
+        localStorage.removeItem(`lockscreen_data_${schedule.id}`);
+        localStorage.removeItem('lockscreen_last_draft');
       } else {
-         try {
-           localStorage.setItem(`lockscreen_data_${schedule.id}`, JSON.stringify(dataToSave));
-         } catch(e) {
-           console.warn("Storage quota exceeded, could not save image to local storage.");
-         }
+        try {
+          const json = JSON.stringify(dataToSave);
+          localStorage.setItem(`lockscreen_data_${schedule.id}`, json);
+          localStorage.setItem('lockscreen_last_draft', json);
+        } catch(e) {
+          console.warn("Storage quota exceeded, could not save image to local storage.");
+        }
       }
     };
 
@@ -110,9 +116,10 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
     setShowAnswerPopup(true);
     setAiAnswer(null);
     try {
+      const hasGeneralKnowledge = (schedule.selectedResourceIds || []).includes('ai-general-knowledge');
       let resourcesText = resources.filter(r => (schedule.selectedResourceIds || []).includes(r.id)).map(r => `--- ${r.title} ---\n${r.content}`).join('\n\n');
-      if ((schedule.selectedResourceIds || []).includes('ai-general-knowledge')) {
-        resourcesText += '\n\n=== SYSTEM NOTE ===\nThe AI is authorized to use external general knowledge to complete this task.';
+      if (hasGeneralKnowledge) {
+        resourcesText += '\n\n=== SYSTEM NOTE ===\nThe AI is authorized to browse online knowledge, use live web search, and draw from external general knowledge to complete this task.';
       }
 
       const answer = await generateAnswer({
@@ -122,6 +129,7 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
         apiKey: settings.apiKey || '',
         apiModel: settings.apiModel || 'gemini-2.0-flash',
         customPrompts: settings.prompts,
+        isGeneralKnowledge: hasGeneralKnowledge,
       });
 
       if (answer) {
@@ -145,12 +153,13 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
       
       if (remaining === 0) {
         clearInterval(timer);
-        localStorage.removeItem(`lockscreen_data_${schedule.id}`);
+        endLockdown(); // Instantly release kiosk mode / lock task mode
+        // Retain draft in lockscreen_last_draft so student can re-lock and submit without losing work
         onTimeout();
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [lockEndTime, onTimeout, getCurrentTime]);
+  }, [lockEndTime, onTimeout, getCurrentTime, schedule.id]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -158,11 +167,9 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  
-  
   const runOCR = async (file: File) => {
     setIsTranscribing(true);
-    setTranscribedText(null);
+    setOcrError(null);
     try {
       const data = await parseResource({
         file,
@@ -174,9 +181,16 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
         formattedOcrKey: settings.formattedOcrKey || '',
         customPrompts: settings.prompts,
       });
-      setTranscribedText(data.error ? `[OCR Failed: ${data.error}]` : data.content);
+      if (data.error) {
+        setOcrError(data.error);
+      } else if (data.content) {
+        setTranscribedText(data.content);
+        setOcrError(null);
+      } else {
+        setOcrError('No text could be extracted from the image. You can manually type your handwritten answer below.');
+      }
     } catch (err: any) {
-      setTranscribedText(`[OCR Error: ${err.message}]`);
+      setOcrError(err.message || 'OCR service timed out or failed. You can manually type your answer below.');
     } finally {
       setIsTranscribing(false);
     }
@@ -197,13 +211,17 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
     }
   };
 
-
-  
   const handleSubmit = () => {
-    if (selectedFile) {
-      // NOTE: We no longer clear localStorage here. It is cleared in App.tsx ONLY if evaluation passes.
-      onSubmitHomework(selectedFile, ocrType, transcribedText || undefined);
+    if (!selectedFile) {
+      alert("Please attach a photo of your physical homework first.");
+      return;
     }
+    if (!transcribedText || !transcribedText.trim()) {
+      alert("Please enter or transcribe your homework answer before submitting.");
+      return;
+    }
+    // NOTE: We no longer clear localStorage here. It is cleared in App.tsx ONLY if evaluation passes.
+    onSubmitHomework(selectedFile, ocrType, transcribedText.trim());
   };
 
 
@@ -283,6 +301,31 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
             </div>
           </div>
 
+          {schedule.selectedResourceIds && schedule.selectedResourceIds.length > 0 && (
+            <div>
+              <h4 className="text-gray-500 font-bold uppercase text-xs mb-1">Attached Resources</h4>
+              <div className="flex flex-wrap gap-2">
+                {schedule.selectedResourceIds.map(resId => {
+                  if (resId === 'ai-general-knowledge') {
+                    return (
+                      <span key="ai-general-knowledge" className="px-2.5 py-1 bg-indigo-950/60 border border-indigo-800 rounded-lg text-xs font-bold text-indigo-300 flex items-center shadow-xs">
+                        <Sparkles className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
+                        🌐 General AI Knowledge
+                      </span>
+                    );
+                  }
+                  const res = resources.find(r => r.id === resId);
+                  return res ? (
+                    <span key={res.id} className="px-2 py-1 bg-gray-900 border border-gray-800 rounded-lg text-xs font-bold text-gray-300 flex items-center">
+                      <FileText className="w-3 h-3 mr-1 text-gray-500" />
+                      {res.title}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            </div>
+          )}
+
           <div>
             <h4 className="text-gray-500 font-bold uppercase text-xs mb-1">Grading Rubric</h4>
             <div className="bg-black/40 p-4 rounded-xl border border-red-900/30 max-h-48 overflow-y-auto">
@@ -320,29 +363,23 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
             </div>
           </div>
           {!previewUrl ? (
-            <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="w-full">
               <button
                 type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                className="group p-6 rounded-2xl border-2 border-dashed border-gray-700 hover:border-indigo-500 bg-gray-950/50 hover:bg-gray-900/80 transition-all flex flex-col items-center justify-center text-center cursor-pointer shadow-sm hover:shadow-indigo-500/10"
+                onClick={() => setShowUploadPicker(true)}
+                className="group w-full p-6 sm:p-7 rounded-2xl border-2 border-dashed border-gray-700 hover:border-indigo-500 bg-gray-950/50 hover:bg-gray-900/80 transition-all flex flex-col items-center justify-center text-center cursor-pointer shadow-sm hover:shadow-indigo-500/10"
               >
-                <div className="w-14 h-14 rounded-full bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 group-hover:scale-110 flex items-center justify-center mb-3 transition-all">
-                  <Camera className="w-7 h-7" />
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 group-hover:scale-105 flex items-center justify-center mb-3 transition-all relative">
+                  <Camera className="w-6 h-6 absolute -translate-x-1.5 -translate-y-1 text-indigo-400" />
+                  <Upload className="w-5 h-5 absolute translate-x-2 translate-y-1.5 text-indigo-300" />
                 </div>
-                <span className="text-white font-bold text-base mb-1">Capture with Camera</span>
-                <span className="text-gray-400 text-xs leading-relaxed">Take a photo of physical handwritten work</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="group p-6 rounded-2xl border-2 border-dashed border-gray-700 hover:border-indigo-500 bg-gray-950/50 hover:bg-gray-900/80 transition-all flex flex-col items-center justify-center text-center cursor-pointer shadow-sm hover:shadow-indigo-500/10"
-              >
-                <div className="w-14 h-14 rounded-full bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 group-hover:scale-110 flex items-center justify-center mb-3 transition-all">
-                  <Upload className="w-7 h-7" />
+                <span className="text-white font-bold text-base mb-1">Upload Homework</span>
+                <span className="text-gray-400 text-xs leading-relaxed max-w-sm">
+                  Tap to choose Camera or Files & Gallery
+                </span>
+                <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-semibold text-indigo-400 bg-indigo-950/40 px-2.5 py-0.5 rounded-full border border-indigo-900/50">
+                  <span>Camera + Files Supported</span>
                 </div>
-                <span className="text-white font-bold text-base mb-1">Upload from Files / Gallery</span>
-                <span className="text-gray-400 text-xs leading-relaxed">Choose an existing image or document</span>
               </button>
             </div>
           ) : (
@@ -365,6 +402,18 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
               </div>
 
               <div className="w-full mb-6 flex flex-col">
+                {ocrError && (
+                  <div className="w-full mb-4 p-3.5 bg-amber-950/60 border border-amber-800/80 rounded-xl text-xs text-amber-200 flex items-start gap-2.5 shadow-sm text-left">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-amber-300">OCR Notice: </span>
+                      <span>{ocrError}</span>
+                      <p className="mt-1 text-amber-200/80 leading-relaxed">
+                        You can manually type your answer in the text box below. Your attached physical photo will still be sent as proof.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 
                 <h4 className="text-gray-400 font-medium mb-2 flex items-center justify-between">
                   <span>Transcribed Text</span>
@@ -384,27 +433,29 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
                   value={transcribedText || ''}
                   onChange={(e) => setTranscribedText(e.target.value)}
                   disabled={isTranscribing}
-                  placeholder={isTranscribing ? "Running OCR..." : "Transcription will appear here..."}
+                  placeholder={isTranscribing ? "Running OCR..." : "Transcription will appear here (or manually type your answer)..."}
                   className="w-full h-32 bg-gray-950 border border-gray-700 rounded-xl p-3 text-sm text-gray-300 font-mono focus:border-indigo-500 focus:outline-none resize-none disabled:opacity-50"
                 />
-                <p className="text-xs text-gray-500 mt-2">You can edit the transcribed text before submitting to fix any OCR errors.</p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Photo is attached as physical proof. You can edit the text or manually type your answer before submitting.
+                </p>
               </div>
 
               <button
                 onClick={handleSubmit}
-                disabled={isTranscribing}
-                className="w-full py-4 bg-white text-black hover:bg-gray-200 disabled:bg-gray-400 disabled:cursor-not-allowed font-bold rounded-xl transition-colors flex items-center justify-center"
+                disabled={isTranscribing || !transcribedText?.trim()}
+                className="w-full py-4 bg-white text-black hover:bg-gray-200 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed font-bold rounded-xl transition-colors flex items-center justify-center cursor-pointer shadow-md"
               >
-
                 <Upload className="w-5 h-5 mr-2" />
                 Submit for AI Evaluation
               </button>
             </div>
           )}
+
           <input 
             type="file" 
             accept="image/*" 
-            capture="environment" 
+            capture="environment"
             ref={cameraInputRef} 
             className="hidden" 
             onChange={handleFileChange}
@@ -416,6 +467,79 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
             className="hidden" 
             onChange={handleFileChange}
           />
+
+          {/* Action Sheet / Popup for Camera vs Files */}
+          {showUploadPicker && (
+            <div 
+              className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-150"
+              onClick={() => setShowUploadPicker(false)}
+            >
+              <div 
+                className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col gap-3 relative animate-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-gray-800">
+                  <h3 className="text-white font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+                    <Upload className="w-4 h-4 text-indigo-400" />
+                    Select Upload Source
+                  </h3>
+                  <button 
+                    type="button"
+                    onClick={() => setShowUploadPicker(false)}
+                    className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                <p className="text-xs text-gray-400 text-left mb-1">
+                  How would you like to provide your homework photo?
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUploadPicker(false);
+                    cameraInputRef.current?.click();
+                  }}
+                  className="w-full p-4 rounded-2xl bg-gray-800/80 hover:bg-gray-800 border border-gray-700/80 hover:border-indigo-500 flex items-center gap-3.5 transition group text-left cursor-pointer"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 flex items-center justify-center shrink-0">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-white group-hover:text-indigo-300">Camera</span>
+                    <span className="text-xs text-gray-400">Take a fresh photo of your handwritten work</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUploadPicker(false);
+                    fileInputRef.current?.click();
+                  }}
+                  className="w-full p-4 rounded-2xl bg-gray-800/80 hover:bg-gray-800 border border-gray-700/80 hover:border-indigo-500 flex items-center gap-3.5 transition group text-left cursor-pointer"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-sky-500/10 text-sky-400 group-hover:bg-sky-500/20 flex items-center justify-center shrink-0">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-white group-hover:text-sky-300">Files & Gallery</span>
+                    <span className="text-xs text-gray-400">Choose an existing image or document</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowUploadPicker(false)}
+                  className="w-full py-2.5 bg-gray-950 hover:bg-gray-800 text-gray-400 hover:text-white rounded-xl text-xs font-bold transition border border-gray-800 mt-1 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         
         {(settings.allowedApps && settings.allowedApps.length > 0) && (
