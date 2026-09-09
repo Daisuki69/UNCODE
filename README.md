@@ -6,12 +6,13 @@
 ![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%7C%20TypeScript-61DAFB?style=for-the-badge&logo=react&logoColor=black)
 ![Bridge](https://img.shields.io/badge/Bridge-Capacitor%207-119EFF?style=for-the-badge&logo=capacitor&logoColor=white)
 ![AI Engine](https://img.shields.io/badge/AI%20Evaluation-Google%20Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)
-![Styling](https://img.shields.io/badge/Styling-Tailwind%20CSS%204-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![API Model](https://img.shields.io/badge/API-Bring%20Your%20Own%20Key%20(BYOK)-FF9800?style=for-the-badge)
+![Offline Support](https://img.shields.io/badge/Offline-Resources%20%26%20Lockdown-2196F3?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 **The uncompromising, AI-evaluated study lockdown & focus enforcement system for Android.**
 
-[Overview](#-overview) • [Key Features](#-key-features) • [Setup Guide](#-setup-guide) • [qiezka.bat Configuration](#%EF%B8%8F-customizing-qiezkabat) • [Security Model](#-security--anti-cheat-architecture) • [Tech Stack](#-tech-stack)
+[Overview](#-overview) • [Connectivity & BYOK](#-online-architecture--offline-resources-byok) • [Key Features](#-key-features) • [Setup Guide](#-setup-guide) • [qiezka.bat Configuration](#%EF%B8%8F-customizing-qiezkabat) • [Security Model](#-security--anti-cheat-architecture) • [Tech Stack](#-tech-stack)
 
 </div>
 
@@ -24,23 +25,78 @@
 - 📱 **Normal Phone Capabilities Preserved**: Navigation buttons (Home, Back, Recents) continue to work normally. You are not trapped in a broken full-screen jail.
 - 🚫 **Instant Distraction Redirection**: Any attempt to open a non-whitelisted app or system settings immediately sends the user back to the Home screen in milliseconds.
 - ⚡ **Quick Settings Tile Collapse**: The notification shade remains accessible for reading urgent messages, but the Quick Settings tile expansion is collapsed in real time to prevent toggling Wi-Fi, Airplane mode, or system toggles.
-- 🧠 **AI-Verified Early Unlock**: No "give up" button or soft timers. The only way to unlock early is to write your homework or notes on physical paper, photograph it, and have **Google Gemini AI** evaluate your handwriting against your study rubric in real time.
+- 🌐 **Online AI-Verified Early Unlock (BYOK)**: No "give up" button or soft timers. The only way to unlock early is to write your homework or notes on physical paper, photograph it, and have **Google Gemini AI** evaluate your handwriting against your study rubric in real time using your own API key.
+- 📴 **Offline Resource & Lockdown Capability**: All study resources, document ingestion (`.docx`, `.txt`, `.md`), notes management, timers, and Android native app blocking work **100% offline** without any internet connection.
 - 📸 **Camera & File Picker Exemptions**: When taking photos or selecting documents for AI homework grading, QIEZKA's native accessibility engine intelligently recognizes system camera intents and file pickers, preventing false-positive lockouts.
+
+---
+
+## 🌐 Online Architecture & Offline Resources (BYOK)
+
+QIEZKA is designed as a **hybrid online/offline system** with a strict **Bring Your Own Key (BYOK)** privacy model:
+
+```
+                                  QIEZKA SYSTEM
+                                        │
+        ┌───────────────────────────────┴───────────────────────────────┐
+        ▼                                                               ▼
+[ ONLINE FEATURES ]                                             [ OFFLINE FEATURES ]
+Requires Internet + Personal API Key                            Works 100% Without Internet
+ • Handwritten Homework AI Evaluation (Gemini)                   • Study Resource Library & Notes Editor
+ • Real-time Photo OCR Transcription (OCR.space)                 • Local Document Parsing (.docx, .txt, .md)
+ • AI Prompt Refinement & Dynamic Rubrics                        • Focus Session Timers & Countdown
+ • Cloud Model Selection (Gemini 2.5/2.0/Flash/Pro)              • Selective App Blocking (Accessibility)
+                                                                 • Quick Settings Shield & Recents Guard
+                                                                 • Device Admin Anti-Uninstall Protection
+                                                                 • Full JSON Data Backup & Restore
+```
+
+### 1. What Works Offline (Resources & Lockdown Only)
+- **Local Study Resources**: You can create, edit, search, organize, and review all your notes, syllabi, and study materials with zero internet connection.
+- **Client-Side Document Parsing**: Ingestion of `.txt`, `.md`, and Microsoft Word `.docx` documents is processed directly inside your browser/WebView using local in-memory engines ([Mammoth](https://github.com/mwilliamson/mammoth.js)).
+- **Focus Enforcement & Lockdown Engine**: Android Accessibility service app-blocking, Quick Settings tile collapse, Device Administrator uninstall prevention, and boot recovery operate strictly on-device via native Android OS APIs.
+- **Data Backups**: Export and import complete JSON backups of your settings, resources, and schedules offline.
+
+### 2. What Requires an Online Connection & Your Own API Key (BYOK)
+- **AI Homework Evaluation**: Grading your handwritten homework photo against your study rubric requires connecting to the Google Gemini API.
+- **Photo OCR Transcription**: Extracting text from photographed papers requires connecting to the OCR.space API.
+- **Users Must Provide Their Own API Key (BYOK)**:
+  - **Zero Central Servers**: QIEZKA has no middleman servers, no proxy backends, and no proprietary accounts.
+  - **100% Private**: Your API keys and homework photos travel directly from your phone to Google / OCR.space over encrypted HTTPS.
+  - **Always Free**: Both Google Gemini and OCR.space provide generous **free tiers** that require no payment.
+
+---
+
+## 🔑 How to Get Your Free API Keys
+
+QIEZKA takes 1 minute to configure with free keys:
+
+### 1. Google Gemini API Key (Required for AI Evaluation)
+1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. Sign in with any Google account.
+3. Click **"Create API Key"** and copy the generated key (starts with `AIzaSy...`).
+4. In QIEZKA, tap the **Settings (gear icon)** at the top right, paste it into **Gemini API Key**, and tap **Save**.
+
+### 2. OCR.space API Key (Required for Image Transcription)
+1. Visit [OCR.space Free API Registration](https://ocr.space/ocrapi/freekey).
+2. Enter your email and name; your free API key will be delivered instantly.
+3. In QIEZKA, paste it into **Simple OCR API Key** or **Formatted OCR API Key** under Settings and tap **Save**.
 
 ---
 
 ## ✨ Key Features
 
-| Feature | Details |
-|---|---|
-| 🎯 **Selective App Filtering** | Whitelist required tools (Calculator, Notes, Dictionary, Music, PDF Reader). All non-approved apps are immediately suppressed and routed to Home via Android Accessibility. |
-| 🛡️ **Quick Settings Defense** | Allows the notification shade for reading text alerts while collapsing Quick Settings tiles to prevent bypass via status toggles. |
-| 🔄 **Anti-Cheat Boot Persistence** | Restarting the phone will not break the lockdown session—`BootReceiver` detects active timers and immediately re-engages QIEZKA upon system boot. |
-| 🔒 **Uninstall Protection** | Activated as a standard **Device Administrator**. Android blocks uninstallation until administrator privileges are revoked; because QIEZKA blocks Android Settings during lockdown, deactivation is impossible. |
-| 📑 **Dual Submission Flow** | Choose between capturing physical handwritten pages with your live camera (`capture="environment"`) or selecting files/photos from your device gallery. |
-| 🤖 **AI Homework Evaluation** | Built-in OCR pipeline connected with Google Gemini models (Gemini 2.5, Gemini 2.0, Gemini 1.5) that inspects work quality against a custom rubric before allowing an unlock. |
-| 🔋 **Doze & Battery Saver Immunity** | Whitelists QIEZKA from aggressive Android Doze and OEM power managers (Samsung OneUI, Xiaomi MIUI/HyperOS, Pixel) to prevent timers from being killed. |
-| 🛠️ **Dual Setup Pathways** | Complete configuration 100% on-device via guided interactive prompts, or automate the entire setup in seconds with `qiezka.bat` over USB debugging. |
+| Feature | Details | Network Requirement |
+|---|---|:---:|
+| 🎯 **Selective App Filtering** | Whitelist required tools (Calculator, Notes, Dictionary, Music, PDF Reader). All non-approved apps are immediately suppressed and routed to Home via Android Accessibility. | 📴 **Offline** |
+| 🛡️ **Quick Settings Defense** | Allows the notification shade for reading text alerts while collapsing Quick Settings tiles to prevent bypass via status toggles. | 📴 **Offline** |
+| 🔄 **Anti-Cheat Boot Persistence** | Restarting the phone will not break the lockdown session—`BootReceiver` detects active timers and immediately re-engages QIEZKA upon system boot. | 📴 **Offline** |
+| 🔒 **Uninstall Protection** | Activated as a standard **Device Administrator**. Android blocks uninstallation until administrator privileges are revoked; because QIEZKA blocks Android Settings during lockdown, deactivation is impossible. | 📴 **Offline** |
+| 📚 **Resource Library** | Create, view, edit, and organize lecture notes, study outlines, syllabi, and local `.docx`/`.txt` files client-side. | 📴 **Offline** |
+| 🤖 **AI Homework Evaluation** | Built-in OCR pipeline connected with Google Gemini models (Gemini 2.5, Gemini 2.0, Gemini 1.5) that inspects work quality against a custom rubric before allowing an unlock. | 🌐 **Online (BYOK)** |
+| 📑 **Dual Submission Flow** | Choose between capturing physical handwritten pages with your live camera (`capture="environment"`) or selecting files/photos from your device gallery. | 🌐 **Online (BYOK)** |
+| 🔋 **Doze & Battery Saver Immunity** | Whitelists QIEZKA from aggressive Android Doze and OEM power managers (Samsung OneUI, Xiaomi MIUI/HyperOS, Pixel) to prevent timers from being killed. | 📴 **Offline** |
+| 🛠️ **Dual Setup Pathways** | Complete configuration 100% on-device via guided interactive prompts, or automate the entire setup in seconds with `qiezka.bat` over USB debugging. | 📴 **Offline** |
 
 ---
 

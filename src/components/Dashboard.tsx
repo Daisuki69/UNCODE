@@ -518,8 +518,8 @@ export function Dashboard({
             <div className="mb-2 max-w-md mx-auto bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm font-medium flex items-start text-left">
               <ShieldAlert className="w-5 h-5 flex-shrink-0 mr-3 mt-0.5" />
               <div>
-                <strong className="block font-bold mb-1">OCR API Key Required</strong>
-                You must provide an OCR API Key (Simple or Formatted) in Settings to extract text from images.
+                <strong className="block font-bold mb-1">OCR API Key Required (Online Grading)</strong>
+                Provide your free OCR API Key (Simple or Formatted) in Settings to transcribe handwritten homework photos.
               </div>
             </div>
           )}
@@ -527,8 +527,8 @@ export function Dashboard({
             <div className="mb-6 max-w-md mx-auto bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm font-medium flex items-start text-left">
               <ShieldAlert className="w-5 h-5 flex-shrink-0 mr-3 mt-0.5" />
               <div>
-                <strong className="block font-bold mb-1">Gemini API Key Required</strong>
-                You must provide your own Gemini API key to run this app. Click the Settings gear icon (top right) to add it before proceeding.
+                <strong className="block font-bold mb-1">Gemini API Key Required (BYOK)</strong>
+                QIEZKA requires you to provide your own Google Gemini API key for online AI evaluation. Study resources and lockdown operate offline, but online grading requires your key. Tap Settings (gear icon) to configure it.
               </div>
             </div>
           )}

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<device-admin>
-    <uses-policies>
-        <!-- Allows suspending app packages during lockdown -->
-        <!-- Device Owner grants additional APIs like setPackagesSuspended -->
-    </uses-policies>
-</device-admin>

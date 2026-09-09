@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Save, Trash2, Cpu, FileText, Wand2, RefreshCw, ArrowLeft, Clock, Activity } from 'lucide-react';
+import { X, Key, Save, Trash2, Cpu, FileText, Wand2, RefreshCw, ArrowLeft, Clock, Activity, Globe } from 'lucide-react';
 import { AppSettings, LogEntry, SavedResource } from '../types';
 import { defaultPrompts as staticDefaultPrompts } from '../../defaultPrompts';
 import { refinePrompt } from '../api/refinePrompt';
@@ -209,8 +209,21 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
                   <span>You cannot modify API keys while a schedule is active. Please complete or cancel your active schedule first.</span>
                 </div>
               )}
+              <div className="mb-6 p-4 bg-indigo-50/80 border border-indigo-200/80 rounded-2xl text-xs text-indigo-950 space-y-2">
+                <div className="flex items-center font-bold text-indigo-900 gap-1.5 uppercase tracking-wider text-[11px]">
+                  <Globe className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Bring Your Own Key (BYOK) & Connectivity Architecture</span>
+                </div>
+                <p className="leading-relaxed text-indigo-900/90">
+                  <strong>Online Requirement:</strong> QIEZKA connects directly to Google Gemini and OCR.space using your personal API keys for homework evaluation. Keys remain 100% private and stored locally on your device.
+                </p>
+                <p className="leading-relaxed text-indigo-800">
+                  <strong>Offline Mode:</strong> Study resources (notes, syllabi, Word .docx, .txt), timer schedules, and selective app lockdown operate entirely <strong>offline</strong> without an internet connection.
+                </p>
+              </div>
+
               <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-                Configure your API credentials and model for standard evaluation flows.
+                Configure your personal API credentials below. Both Gemini and OCR.space offer free tier API keys.
               </p>
               <div className="mb-6">
                 <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wider">
