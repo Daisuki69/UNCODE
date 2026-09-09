@@ -236,6 +236,59 @@ export const HARDCODED_BLACKLISTED_PACKAGES: string[] = [
   'com.tokopedia.tkpd',                  // Tokopedia
   'com.bukalapak.android',               // Bukalapak
   'com.mercadolibre',                    // Mercado Libre
+
+  // ── Virtual OS, Containers & Sandbox Bypass Tools ──
+  'com.vmos.app',                        // VMOS Virtual Android
+  'com.vmos.pro',                        // VMOS Pro
+  'com.vmos.vmospro',                    // VMOS Pro
+  'com.f1player.f1vm',                   // F1 VM
+  'com.f1vm.android',                    // F1 VM Android
+  'com.vphonegaga.titan',                // VPhoneGaGa
+  'com.x8zs.sandbox',                    // X8 Sandbox
+  'com.oasisfeng.island',                // Island (Work profile bypass)
+  'net.typeblog.shelter',                // Shelter (Work profile bypass)
+  'bin.mt.plus',                         // MT Manager (APK reverse engineering/cloning)
+  'com.mcal.np',                         // NP Manager
+  'ru.maximoff.apktool',                 // Apktool M
+  'com.google.android.apps.apkeditor',   // APK Editor
+
+  // ── Fanfic, Web Novels & Light Novels ──
+  'wp.wattpad',                          // Wattpad
+  'com.qidian.Int.reader',               // Webnovel
+  'mobi.mangatoon.novel',                // MangaToon
+  'mobi.mangatoon.noveltoon',            // NovelToon
+  'com.wuxiaworld.mobile',               // Wuxiaworld
+  'com.shosetsu.android',                // Shosetsu
+
+  // ── Live Video Feeds & Stranger Chats ──
+  'video.chat.ometv',                    // OmeTV
+  'com.duoduo.ometv',                    // OmeTV Alternative
+  'sg.bigo.live',                        // Bigo Live
+  'com.sgiggle.production',              // Tango
+  'com.machipopo.media17',               // 17LIVE
+  'co.yubo.mobile',                      // Yubo
+
+  // ── Dating & Swiping Apps ──
+  'com.tinder',                          // Tinder
+  'com.bumble.app',                      // Bumble
+  'co.hinge.app',                        // Hinge
+  'com.badoo.mobile',                    // Badoo
+  'com.zenmen.omi',                      // Omi
+  'com.grindrapp.android',               // Grindr
+
+  // ── Gambling & Sports Betting ──
+  'com.draftkings.dknative',             // DraftKings
+  'com.fanduel.sportsbook',              // FanDuel
+  'com.pokerstars.android',              // PokerStars
+  'com.bet365Wrapper.Bet365',            // Bet365
+  'com.xbet.android',                    // 1xBet
+  'com.stake.mobile',                    // Stake
+
+  // ── Resale & Bidding ──
+  'com.thecarousell.Carousell',           // Carousell
+  'fr.vinted',                           // Vinted
+  'io.depop',                            // Depop
+  'com.xunmeng.pinduoduo',               // Pinduoduo
 ];
 
 const BLACKLIST_SET = new Set(HARDCODED_BLACKLISTED_PACKAGES.map(p => p.toLowerCase()));
@@ -275,5 +328,23 @@ export function isAppBlacklisted(packageId?: string | null): boolean {
          lower.includes('revanced') ||
          lower.includes('gbwhatsapp') ||
          lower.includes('fmwhatsapp') ||
-         lower.includes('yowhatsapp');
+         lower.includes('yowhatsapp') ||
+         lower.includes('vmos') ||
+         lower.includes('f1vm') ||
+         lower.includes('vphonegaga') ||
+         lower.includes('x8zs') ||
+         lower.includes('wattpad') ||
+         lower.includes('webnovel') ||
+         lower.includes('wuxiaworld') ||
+         lower.includes('ometv') ||
+         lower.includes('bigo') ||
+         lower.includes('tinder') ||
+         lower.includes('bumble') ||
+         lower.includes('pokerstars') ||
+         lower.includes('bet365') ||
+         lower.includes('draftkings') ||
+         lower.includes('fanduel') ||
+         lower.includes('carousell') ||
+         lower.includes('vinted') ||
+         lower.includes('depop');
 }

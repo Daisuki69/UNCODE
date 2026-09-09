@@ -298,6 +298,44 @@ export const KNOWN_STUDENT_PACKAGES: string[] = [
   'com.microsoft.office.word',                            // Microsoft Word
   'com.microsoft.office.excel',                           // Microsoft Excel
   'com.microsoft.office.powerpoint',                      // Microsoft PowerPoint
+
+  // ── Document Scanners & PDF Worksheets ──
+  'com.adobe.reader',                                     // Adobe Acrobat Reader
+  'com.adobe.scan.android',                               // Adobe Scan
+  'com.intsig.camscanner',                                // CamScanner
+  'cn.wps.moffice_eng',                                   // WPS Office
+  'com.microsoft.office.officelens',                      // Microsoft Lens
+  'org.readera',                                          // ReadEra (PDF/EPUB Reader)
+  'com.xodo.pdf.reader',                                  // Xodo PDF Reader
+  'com.foxit.mobile.pdf.lite',                            // Foxit PDF Reader
+
+  // ── Translation & Language Learning ──
+  'com.google.android.apps.translate',                    // Google Translate
+  'com.deepl.mobiletranslator',                           // DeepL Translate
+  'com.duolingo',                                         // Duolingo
+  'com.merriamwebster',                                   // Merriam-Webster Dictionary
+  'com.mobisystems.msdict.embedded.wireless.oxford.dictionaryofenglish', // Oxford Dictionary
+  'org.cambridge.cclae',                                  // Cambridge Dictionary
+
+  // ── STEM Homework Solvers & Learning Hubs ──
+  'org.khanacademy.android',                              // Khan Academy
+  'com.devsense.symbolab',                                // Symbolab Math Solver
+  'com.bagatrix.mathway.android',                         // Mathway
+  'com.chegg',                                            // Chegg Study
+  'org.brilliant.android',                                // Brilliant
+  'mendeleev.redlime',                                    // Periodic Table 2024
+  'com.cymath.cymath',                                    // Cymath
+
+  // ── Cloud Storage & Sync ──
+  'com.microsoft.skydrive',                               // Microsoft OneDrive
+  'com.dropbox.android',                                  // Dropbox
+  'net.box.android',                                      // Box
+
+  // ── CS & Coding Environments ──
+  'com.termux',                                           // Termux
+  'com.foxdebug.acode',                                   // Acode (Code Editor)
+  'ru.iiec.pydroid3',                                     // Pydroid 3 (Python IDE)
+  'com.github.android',                                   // GitHub
 ];
 
 const STUDENT_SET = new Set(KNOWN_STUDENT_PACKAGES.map(p => p.toLowerCase()));
@@ -316,7 +354,21 @@ export function isStudentPackage(packageId?: string | null, appName?: string | n
       lowerId.includes('desmos') ||
       lowerId.includes('geogebra') ||
       lowerId.includes('calculator') ||
-      lowerId.includes('docs.editors')
+      lowerId.includes('docs.editors') ||
+      lowerId.includes('adobe.reader') ||
+      lowerId.includes('camscanner') ||
+      lowerId.includes('translate') ||
+      lowerId.includes('deepl') ||
+      lowerId.includes('duolingo') ||
+      lowerId.includes('khanacademy') ||
+      lowerId.includes('symbolab') ||
+      lowerId.includes('mathway') ||
+      lowerId.includes('chegg') ||
+      lowerId.includes('termux') ||
+      lowerId.includes('pydroid') ||
+      lowerId.includes('skydrive') ||
+      lowerId.includes('dropbox') ||
+      lowerId.includes('readera')
     ) {
       return true;
     }
@@ -333,7 +385,21 @@ export function isStudentPackage(packageId?: string | null, appName?: string | n
       lowerName.includes('slides') ||
       lowerName.includes('quizlet') ||
       lowerName.includes('calculator') ||
-      lowerName.includes('calc')
+      lowerName.includes('calc') ||
+      lowerName.includes('acrobat') ||
+      lowerName.includes('scanner') ||
+      lowerName.includes('translate') ||
+      lowerName.includes('dictionary') ||
+      lowerName.includes('duolingo') ||
+      lowerName.includes('khan academy') ||
+      lowerName.includes('symbolab') ||
+      lowerName.includes('mathway') ||
+      lowerName.includes('chegg') ||
+      lowerName.includes('termux') ||
+      lowerName.includes('onedrive') ||
+      lowerName.includes('dropbox') ||
+      lowerName.includes('readera') ||
+      lowerName.includes('wps office')
     ) {
       return true;
     }

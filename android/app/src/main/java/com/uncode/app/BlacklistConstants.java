@@ -245,7 +245,60 @@ public final class BlacklistConstants {
         "com.ebay.mobile",                     // eBay
         "com.tokopedia.tkpd",                  // Tokopedia
         "com.bukalapak.android",               // Bukalapak
-        "com.mercadolibre"                     // Mercado Libre
+        "com.mercadolibre",                    // Mercado Libre
+
+        // ── Virtual OS, Containers & Sandbox Bypass Tools ──
+        "com.vmos.app",                        // VMOS Virtual Android
+        "com.vmos.pro",                        // VMOS Pro
+        "com.vmos.vmospro",                    // VMOS Pro
+        "com.f1player.f1vm",                   // F1 VM
+        "com.f1vm.android",                    // F1 VM Android
+        "com.vphonegaga.titan",                // VPhoneGaGa
+        "com.x8zs.sandbox",                    // X8 Sandbox
+        "com.oasisfeng.island",                // Island (Work profile bypass)
+        "net.typeblog.shelter",                // Shelter (Work profile bypass)
+        "bin.mt.plus",                         // MT Manager (APK reverse engineering/cloning)
+        "com.mcal.np",                         // NP Manager
+        "ru.maximoff.apktool",                 // Apktool M
+        "com.google.android.apps.apkeditor",   // APK Editor
+
+        // ── Fanfic, Web Novels & Light Novels ──
+        "wp.wattpad",                          // Wattpad
+        "com.qidian.Int.reader",               // Webnovel
+        "mobi.mangatoon.novel",                // MangaToon
+        "mobi.mangatoon.noveltoon",            // NovelToon
+        "com.wuxiaworld.mobile",               // Wuxiaworld
+        "com.shosetsu.android",                // Shosetsu
+
+        // ── Live Video Feeds & Stranger Chats ──
+        "video.chat.ometv",                    // OmeTV
+        "com.duoduo.ometv",                    // OmeTV Alternative
+        "sg.bigo.live",                        // Bigo Live
+        "com.sgiggle.production",              // Tango
+        "com.machipopo.media17",               // 17LIVE
+        "co.yubo.mobile",                      // Yubo
+
+        // ── Dating & Swiping Apps ──
+        "com.tinder",                          // Tinder
+        "com.bumble.app",                      // Bumble
+        "co.hinge.app",                        // Hinge
+        "com.badoo.mobile",                    // Badoo
+        "com.zenmen.omi",                      // Omi
+        "com.grindrapp.android",               // Grindr
+
+        // ── Gambling & Sports Betting ──
+        "com.draftkings.dknative",             // DraftKings
+        "com.fanduel.sportsbook",              // FanDuel
+        "com.pokerstars.android",              // PokerStars
+        "com.bet365Wrapper.Bet365",            // Bet365
+        "com.xbet.android",                    // 1xBet
+        "com.stake.mobile",                    // Stake
+
+        // ── Resale & Bidding ──
+        "com.thecarousell.Carousell",           // Carousell
+        "fr.vinted",                           // Vinted
+        "io.depop",                            // Depop
+        "com.xunmeng.pinduoduo"                // Pinduoduo
     ));
 
     public static boolean isBlacklisted(String packageName) {
@@ -281,6 +334,24 @@ public final class BlacklistConstants {
                lower.contains("revanced") ||
                lower.contains("gbwhatsapp") ||
                lower.contains("fmwhatsapp") ||
-               lower.contains("yowhatsapp");
+               lower.contains("yowhatsapp") ||
+               lower.contains("vmos") ||
+               lower.contains("f1vm") ||
+               lower.contains("vphonegaga") ||
+               lower.contains("x8zs") ||
+               lower.contains("wattpad") ||
+               lower.contains("webnovel") ||
+               lower.contains("wuxiaworld") ||
+               lower.contains("ometv") ||
+               lower.contains("bigo") ||
+               lower.contains("tinder") ||
+               lower.contains("bumble") ||
+               lower.contains("pokerstars") ||
+               lower.contains("bet365") ||
+               lower.contains("draftkings") ||
+               lower.contains("fanduel") ||
+               lower.contains("carousell") ||
+               lower.contains("vinted") ||
+               lower.contains("depop");
     }
 }

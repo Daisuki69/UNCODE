@@ -48,9 +48,14 @@ Algorithmically engineered dopamine traps that hijack human psychology and steal
 
 * 📱 **Short-Form Doomscrolling**: TikTok, Instagram Reels, YouTube Shorts, X/Twitter, Reddit, Facebook, Threads, CapCut.
 * 🍿 **Streaming & Piracy Black Holes**: Bilibili, KissKH (`id.kisskh.twa`), Netflix, Disney+, WeTV, iQIYI, Crunchyroll, Loklok, CloudStream, Mihon, and micro-drama reels (ReelShort, DramaBox, ShortMax).
+* 📖 **Web Novels & Fanfic Sinks**: Wattpad, Webnovel, MangaToon, NovelToon, Wuxiaworld, Shosetsu.
+* 📹 **Live Video Feeds & Stranger Chats**: OmeTV, Bigo Live, Tango, 17LIVE, Yubo.
+* 💬 **Dating & Hookup Apps**: Tinder, Bumble, Hinge, Badoo, Omi, Grindr.
+* 🎲 **Gambling & Sports Betting**: Stake, 1xBet, Bet365, DraftKings, FanDuel, PokerStars.
 * 🎮 **Competitive Games & Gachas**: Roblox, Mobile Legends, Genshin Impact, Honkai: Star Rail, PUBG, Free Fire, Supercell titles, Candy Crush.
-* 🛍️ **Impulsive Shopping**: Shopee, Lazada, Amazon, Temu, Shein, AliExpress, TikTok Shop.
+* 🛍️ **Impulsive Shopping & Resale**: Shopee, Lazada, Amazon, Temu, Shein, AliExpress, Carousell, Vinted, Depop.
 * 💉 **Modded Clients & Game Hacks**: Lucky Patcher, InstaPrime, GameGuardian, ReVanced, Instander, AeroInsta.
+* 📦 **Virtual OS & Sandbox Bypassers**: VMOS, F1 VM, VPhoneGaGa, X8 Sandbox, Island, Shelter, MT Manager, NP Manager.
 
 ---
 
@@ -60,9 +65,13 @@ During lockdown, students need tools to learn, calculate, write, and submit assi
 | Category | Permitted Tools | Why It's Hardcoded Allowed |
 |---|---|---|
 | 🤖 **AI Study Assistants** | **Google Gemini, ChatGPT, Claude, Microsoft Copilot, Perplexity, DeepSeek, Poe, Pi AI** | **Why AI?** AI is the ultimate 24/7 personal tutor. If an AI helps you grasp complex physics, explain calculus, draft an outline, or debug code so you finish your homework on time, **that is a win**. The goal is conquering procrastination, not denying modern intelligence. |
+| 📄 **Document Scanners & PDF Worksheets** | **Adobe Acrobat Reader, CamScanner, Adobe Scan, WPS Office, Microsoft Lens, ReadEra, Xodo PDF** | Essential for viewing homework sheets, reading textbooks, and scanning handwritten pages for submission. |
+| 🌐 **Translation & Language Learning** | **Google Translate, DeepL Translate, Duolingo, Merriam-Webster, Oxford & Cambridge Dictionaries** | Seamless translation of source materials and foreign language homework. |
 | 📝 **All Notes Apps** | **Google Keep, Samsung Notes, Microsoft OneNote, Notion, Obsidian, Evernote, ColorNote, Squid, Simplenote** | Students must always be able to jot ideas, review lecture outlines, and brainstorm without obstacles. |
 | 🎓 **Student Platforms & Storage** | **Google Classroom, Drive, Docs, Sheets, Slides, Canvas Student, Blackboard Learn, Schoology, Quizlet, AnkiDroid** | Your textbooks, problem sets, syllabi, and submission portals must never be blocked. |
-| 🧮 **STEM Calculators** | **Desmos Graphing Calculator, GeoGebra, Photomath, WolframAlpha, system calculators** | Modern coursework requires computing and graphing horsepower. |
+| 🧮 **STEM Solvers & Hubs** | **Khan Academy, Symbolab, Mathway, Chegg Study, Desmos Graphing, GeoGebra, Photomath, WolframAlpha, Brilliant, Periodic Table** | Step-by-step problem solving, calculus derivations, and science lesson reviews. |
+| ☁️ **Cloud Storage & Sync** | **Microsoft OneDrive, Dropbox, Box** | Immediate access to school cloud accounts and project repositories. |
+| 💻 **CS & Coding Environments** | **Termux, Acode, Pydroid 3, GitHub** | Full-fledged Linux terminal, code editor, and Python environment for Computer Science coursework. |
 | 🛡️ **2FA Authenticators** | **Google Authenticator, Microsoft Authenticator, Duo Mobile, Authy, 2FAS, Aegis, Bitwarden** | Zero lockouts. Signing into university portals and Google accounts must remain frictionless. |
 | 🎵 **Deep Focus Audio & Browsers** | **Spotify, YouTube Music, Apple Music, Tidal, Chrome, Firefox, Brave** | Deep work requires a flow state. Background binaural beats, lo-fi study tracks, and web research are always accessible. |
 

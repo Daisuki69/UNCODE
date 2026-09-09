@@ -204,7 +204,45 @@ public class LockAccessibilityService extends AccessibilityService {
         "com.microsoft.office.officehubrow",
         "com.microsoft.office.word",
         "com.microsoft.office.excel",
-        "com.microsoft.office.powerpoint"
+        "com.microsoft.office.powerpoint",
+
+        // Document Scanners & PDF Worksheets
+        "com.adobe.reader",
+        "com.adobe.scan.android",
+        "com.intsig.camscanner",
+        "cn.wps.moffice_eng",
+        "com.microsoft.office.officelens",
+        "org.readera",
+        "com.xodo.pdf.reader",
+        "com.foxit.mobile.pdf.lite",
+
+        // Translation & Language Learning
+        "com.google.android.apps.translate",
+        "com.deepl.mobiletranslator",
+        "com.duolingo",
+        "com.merriamwebster",
+        "com.mobisystems.msdict.embedded.wireless.oxford.dictionaryofenglish",
+        "org.cambridge.cclae",
+
+        // STEM Homework Solvers & Learning Hubs
+        "org.khanacademy.android",
+        "com.devsense.symbolab",
+        "com.bagatrix.mathway.android",
+        "com.chegg",
+        "org.brilliant.android",
+        "mendeleev.redlime",
+        "com.cymath.cymath",
+
+        // Cloud Storage & Sync
+        "com.microsoft.skydrive",
+        "com.dropbox.android",
+        "net.box.android",
+
+        // CS & Coding Environments
+        "com.termux",
+        "com.foxdebug.acode",
+        "ru.iiec.pydroid3",
+        "com.github.android"
     ));
 
     /**
@@ -390,7 +428,22 @@ public class LockAccessibilityService extends AccessibilityService {
                lower.contains("docs.editors") || 
                (lower.contains("google") && lower.contains("docs")) || 
                lower.contains("photomath") || 
-               lower.contains("wolfram");
+               lower.contains("wolfram") ||
+               lower.contains("adobe.reader") ||
+               lower.contains("camscanner") ||
+               lower.contains("translate") ||
+               lower.contains("deepl") ||
+               lower.contains("duolingo") ||
+               lower.contains("khanacademy") ||
+               lower.contains("symbolab") ||
+               lower.contains("mathway") ||
+               lower.contains("chegg") ||
+               lower.contains("termux") ||
+               lower.contains("pydroid") ||
+               lower.contains("skydrive") ||
+               lower.contains("dropbox") ||
+               lower.contains("readera") ||
+               lower.contains("wps");
     }
 
     private boolean isAiApp(String pkg) {
