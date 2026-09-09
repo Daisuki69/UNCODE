@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, Key, Save, Trash2, Cpu, FileText, Wand2, RefreshCw, ArrowLeft, Clock, Activity } from 'lucide-react';
-import { AppSettings, LogEntry } from '../types';
+import { AppSettings, LogEntry, SavedResource } from '../types';
 import { defaultPrompts as staticDefaultPrompts } from '../../defaultPrompts';
+import { refinePrompt } from '../api/refinePrompt';
+import { loadData, saveData } from '../storage';
+import { exportBackup } from '../systemBridge';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 
 interface SettingsOverlayProps {
   settings: AppSettings;
@@ -47,6 +51,65 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
     onSave({ apiKey: undefined, apiModel: 'gemini-3.7-flash', simpleOcrKey: undefined, formattedOcrKey: undefined });
   };
 
+  const handleExport = async () => {
+    try {
+      const allData = {
+        settings: await loadData<AppSettings>('studom_settings', settings),
+        resources: await loadData<SavedResource[]>('studom_resources', []),
+        logs: await loadData<LogEntry[]>('studom_logs', []),
+        completedHomeworks: await loadData<any[]>('studom_completed_homeworks', []),
+        timeOffset: await loadData<number>('studom_timeOffset', 0)
+      };
+      
+      const jsonString = JSON.stringify(allData, null, 2);
+      const tempFileName = `temp_uncode_backup_${Date.now()}.json`;
+      const defaultName = `uncode_backup_${new Date().toISOString().slice(0,10)}.json`;
+
+      // Write to internal cache
+      await Filesystem.writeFile({
+        path: tempFileName,
+        data: jsonString,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8,
+      });
+
+      // Hand off to native SAF picker
+      await exportBackup(tempFileName, defaultName);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export data.");
+    }
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e2) => {
+        try {
+          const text = e2.target?.result as string;
+          const data = JSON.parse(text);
+          if (data.settings) await saveData('studom_settings', data.settings);
+          if (data.resources) await saveData('studom_resources', data.resources);
+          if (data.logs) await saveData('studom_logs', data.logs);
+          if (data.completedHomeworks) await saveData('studom_completed_homeworks', data.completedHomeworks);
+          if (data.timeOffset !== undefined) await saveData('studom_timeOffset', data.timeOffset);
+          
+          alert("Import successful! The app will now reload.");
+          window.location.reload();
+        } catch (err) {
+          alert("Failed to parse JSON backup.");
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
   const handlePromptChange = (key: string, value: string) => {
     setCustomPrompts(prev => ({ ...prev, [key]: value }));
   };
@@ -70,34 +133,14 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
 
     setRefiningKey(key);
     try {
-      const res = await fetch('/api/refine-prompt', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'x-api-model': apiModel
-        },
-        body: JSON.stringify({ promptText: value })
+      const refined = await refinePrompt({
+        promptText: value,
+        apiKey,
+        apiModel,
       });
-      
-      const rawText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        if (!res.ok) {
-          throw new Error(`Server error (${res.status})`);
-        } else {
-          throw new Error(`Unexpected response format from server.`);
-        }
-      }
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to refine prompt.');
-      }
-
-      if (data.refined) {
-        const newPrompts = { ...customPrompts, [key]: data.refined };
+      if (refined) {
+        const newPrompts = { ...customPrompts, [key]: refined };
         setCustomPrompts(newPrompts);
         onSave({ prompts: newPrompts });
       } else {
@@ -256,22 +299,43 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                 />
               </div>
-              <div className="flex space-x-3 mt-8">
-                <button
-                  onClick={handleClearGeneral}
-                  className="px-6 py-3 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl flex items-center transition-colors flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Reset
-                </button>
-                <button
-                  onClick={handleSaveGeneral}
-                  className="px-6 py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-xl shadow-lg flex items-center transition-colors flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Save
-                </button>
-              </div>
+                <div className="flex gap-4 pt-4">
+                  <button
+                    onClick={handleClearGeneral}
+                    className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-bold transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                    Clear
+                  </button>
+                  <button
+                    onClick={handleSaveGeneral}
+                    className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-colors"
+                  >
+                    <Save className="w-5 h-5" />
+                    Save Changes
+                  </button>
+                </div>
+
+                <div className="mt-8 pt-8 border-t border-gray-100">
+                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Data Management</h3>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={handleExport}
+                      className="flex-1 flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-700 py-3 rounded-xl font-bold transition-colors border border-gray-200"
+                    >
+                      Export Backup
+                    </button>
+                    <button
+                      onClick={handleImport}
+                      className="flex-1 flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-700 py-3 rounded-xl font-bold transition-colors border border-gray-200"
+                    >
+                      Import Backup
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3 text-center">
+                    Exports everything including your massive resources, schedules, and logs into a single .json file.
+                  </p>
+                </div>
             </div>
           )}
 

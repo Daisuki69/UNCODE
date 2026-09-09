@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Upload, Camera, FileWarning, CheckCircle, Sparkles, X, Loader2, RefreshCcw, Calculator, FileText, Music, Globe, MessageSquare, MonitorPlay, BookOpen, LayoutGrid } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ScheduleData, AppSettings, SavedResource } from '../types';
+import { parseResource } from '../api/parseResource';
+import { generateAnswer } from '../api/generateAnswer';
 
 interface LockScreenProps {
   schedule: ScheduleData;
@@ -32,6 +34,7 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
 
   const [ocrType, setOcrType] = useState<'simple' | 'formatted'>(settings.defaultOcrType || 'simple');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Load from local storage on mount
   useEffect(() => {
@@ -107,46 +110,23 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
     setShowAnswerPopup(true);
     setAiAnswer(null);
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (settings.apiKey) headers['x-api-key'] = settings.apiKey;
-      if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
-      if (settings.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
-
       let resourcesText = resources.filter(r => (schedule.selectedResourceIds || []).includes(r.id)).map(r => `--- ${r.title} ---\n${r.content}`).join('\n\n');
       if ((schedule.selectedResourceIds || []).includes('ai-general-knowledge')) {
         resourcesText += '\n\n=== SYSTEM NOTE ===\nThe AI is authorized to use external general knowledge to complete this task.';
       }
 
-      const res = await fetch('/api/generate-answer', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ 
-          content: schedule.homeworkContent, 
-          resourcesText,
-          rubric: schedule.rubricContent
-        })
+      const answer = await generateAnswer({
+        content: schedule.homeworkContent,
+        resourcesText,
+        rubric: schedule.rubricContent,
+        apiKey: settings.apiKey || '',
+        apiModel: settings.apiModel || 'gemini-2.0-flash',
+        customPrompts: settings.prompts,
       });
 
-      const rawText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        if (!res.ok) {
-          throw new Error(`Server error (${res.status})`);
-        } else {
-          throw new Error(`Unexpected response format from server.`);
-        }
-      }
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to generate answer.');
-      }
-      
-      if (data.answer) {
-        setAiAnswer(data.answer);
-        // Save the AI answer to the schedule so it can be harvested
-        schedule.aiAnswer = data.answer;
+      if (answer) {
+        setAiAnswer(answer);
+        schedule.aiAnswer = answer;
       } else {
         setAiAnswer('Error: Empty response from AI.');
       }
@@ -184,37 +164,17 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
     setIsTranscribing(true);
     setTranscribedText(null);
     try {
-      const formData = new FormData();
-      formData.append('document', file);
-      formData.append('type', 'transcription');
-      
-      const headers: Record<string, string> = {};
-      if (settings.apiKey) headers['x-api-key'] = settings.apiKey;
-      if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
-      if (settings.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
-      if (settings.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
-      headers['x-ocr-type'] = ocrType;
-
-      const res = await fetch('/api/parse-resource', {
-        method: 'POST',
-        headers,
-        body: formData
+      const data = await parseResource({
+        file,
+        type: 'transcription',
+        apiKey: settings.apiKey || '',
+        apiModel: settings.apiModel || 'gemini-2.0-flash',
+        ocrType,
+        simpleOcrKey: settings.simpleOcrKey || '',
+        formattedOcrKey: settings.formattedOcrKey || '',
+        customPrompts: settings.prompts,
       });
-      
-      
-      const rawText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 100)}`);
-      }
-
-      if (res.ok && !data.error) {
-        setTranscribedText(data.content);
-      } else {
-        setTranscribedText(`[OCR Failed: ${data.error || 'Unknown error'}]`);
-      }
+      setTranscribedText(data.error ? `[OCR Failed: ${data.error}]` : data.content);
     } catch (err: any) {
       setTranscribedText(`[OCR Error: ${err.message}]`);
     } finally {
@@ -248,7 +208,7 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
 
 
   return (
-    <div className="fixed inset-0 bg-gray-950 flex flex-col items-center justify-center p-6 text-white z-50">
+    <div className="fixed inset-0 bg-gray-950 flex flex-col items-center p-6 text-white z-50 overflow-y-auto" style={{ paddingBottom: 'calc(3rem + var(--safe-bottom))', paddingTop: 'calc(1.5rem + var(--safe-top))' }}>
       <div className="absolute top-0 left-0 w-full h-1 bg-gray-800">
         <motion.div 
           className="h-full bg-red-600"
@@ -360,13 +320,30 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
             </div>
           </div>
           {!previewUrl ? (
-            <div 
-              className="w-full h-56 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-gray-500 transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Camera className="w-12 h-12 text-gray-600 mb-4" />
-              <p className="text-gray-400 font-medium">Capture Handwritten Homework</p>
-              <p className="text-gray-600 text-sm mt-2">Only handwritten submissions will be accepted</p>
+            <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="group p-6 rounded-2xl border-2 border-dashed border-gray-700 hover:border-indigo-500 bg-gray-950/50 hover:bg-gray-900/80 transition-all flex flex-col items-center justify-center text-center cursor-pointer shadow-sm hover:shadow-indigo-500/10"
+              >
+                <div className="w-14 h-14 rounded-full bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 group-hover:scale-110 flex items-center justify-center mb-3 transition-all">
+                  <Camera className="w-7 h-7" />
+                </div>
+                <span className="text-white font-bold text-base mb-1">Capture with Camera</span>
+                <span className="text-gray-400 text-xs leading-relaxed">Take a photo of physical handwritten work</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="group p-6 rounded-2xl border-2 border-dashed border-gray-700 hover:border-indigo-500 bg-gray-950/50 hover:bg-gray-900/80 transition-all flex flex-col items-center justify-center text-center cursor-pointer shadow-sm hover:shadow-indigo-500/10"
+              >
+                <div className="w-14 h-14 rounded-full bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 group-hover:scale-110 flex items-center justify-center mb-3 transition-all">
+                  <Upload className="w-7 h-7" />
+                </div>
+                <span className="text-white font-bold text-base mb-1">Upload from Files / Gallery</span>
+                <span className="text-gray-400 text-xs leading-relaxed">Choose an existing image or document</span>
+              </button>
             </div>
           ) : (
             <div className="w-full flex flex-col items-center">
@@ -378,11 +355,12 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
                     setSelectedFile(null);
                     setPreviewUrl(null);
                     setTranscribedText(null);
+                    if (cameraInputRef.current) cameraInputRef.current.value = '';
                     if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
                   className="absolute top-4 right-4 bg-gray-900/80 p-2 rounded-full hover:bg-red-600 transition-colors"
                 >
-                  <Camera className="w-5 h-5" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
@@ -427,6 +405,13 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
             type="file" 
             accept="image/*" 
             capture="environment" 
+            ref={cameraInputRef} 
+            className="hidden" 
+            onChange={handleFileChange}
+          />
+          <input 
+            type="file" 
+            accept="image/*" 
             ref={fileInputRef} 
             className="hidden" 
             onChange={handleFileChange}
@@ -453,7 +438,11 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
                 
                 return (
                   <div key={app.id} className="flex items-center bg-black/40 border border-gray-800 rounded-xl py-2 px-4 shadow-sm">
-                    <RenderIcon className="w-5 h-5 text-gray-400 mr-2" />
+                    {app.iconBase64 ? (
+                      <img src={`data:image/png;base64,${app.iconBase64}`} alt={app.name} className="w-5 h-5 mr-2 object-cover rounded-sm" />
+                    ) : (
+                      <RenderIcon className="w-5 h-5 text-gray-400 mr-2" />
+                    )}
                     <span className="text-sm font-semibold text-gray-300">{app.name}</span>
                   </div>
                 );

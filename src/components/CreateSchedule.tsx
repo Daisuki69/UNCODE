@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Loader2, Sparkles, Pencil, ArrowRight, Clock, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { ScheduleData, SavedResource } from '../types';
+import { parseResource } from '../api/parseResource';
+import { buildRubric } from '../api/buildRubric';
+import { checkSimilarity } from '../api/checkSimilarity';
+import { validateHomework } from '../api/validateHomework';
 
 interface CreateScheduleProps {
   role: string;
@@ -56,53 +60,23 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
     }
 
     setIsParsing(true);
-    const formData = new FormData();
-    formData.append('document', file);
-    formData.append('type', 'homework');
-
     try {
-      const headers: Record<string, string> = {};
-      if (apiKey) headers['x-api-key'] = apiKey;
-      if (apiModel) headers['x-api-model'] = apiModel;
-      if (settings?.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
-      if (settings?.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
-      if (settings?.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
-      headers['x-ocr-type'] = ocrType;
-
-      const res = await fetch('/api/parse-resource', { 
-        method: 'POST', 
-        headers,
-        body: formData 
+      const data = await parseResource({
+        file,
+        type: 'homework',
+        apiKey: apiKey || '',
+        apiModel: apiModel || 'gemini-2.0-flash',
+        ocrType,
+        simpleOcrKey: settings?.simpleOcrKey || '',
+        formattedOcrKey: settings?.formattedOcrKey || '',
+        customPrompts: settings?.prompts,
       });
-      
-      let data;
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        if (res.status === 413) {
-           throw new Error('File is too large. Please upload a smaller file (under 30MB).');
-        }
-        if (text.includes('<!doctype html>') || text.includes('<!DOCTYPE html>')) {
-          throw new Error('Server returned an unexpected page (possibly due to a proxy or cold start). Please try your upload again.');
-        }
-        throw new Error(`Server returned unexpected response (${res.status}): ${text.substring(0, 50)}...`);
-      }
-      
-      if (!res.ok || data.error) {
-        if (res.status === 401 || (data.error && typeof data.error === 'string' && data.error.includes('UNAUTHENTICATED'))) {
-          throw new Error('Invalid API Key. Please update your API key in the Dashboard Settings.');
-        }
-        throw new Error(data.error || res.statusText);
-      }
-      
+
+      if (data.error) throw new Error(data.error);
       setHomeworkContent(data.content);
       addLog('Uploaded Homework File', file.name);
       setValidationError(null);
-
-            if (data.title) setScheduleTitle(data.title);
-
+      if (data.title) setScheduleTitle(data.title);
     } catch (err: any) {
       showError(`Failed to parse document: ${err.message}`);
       addLog('Error', `Parsing failed: ${err.message}`);
@@ -121,41 +95,23 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
   };
 
   const handleGenerateRubric = async () => {
-
     setIsGeneratingRubric(true);
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (apiKey) headers['x-api-key'] = apiKey;
-      if (apiModel) headers['x-api-model'] = apiModel;
-
       const selectedResources = resources.filter(r => selectedResourceIds.includes(r.id) && r.id !== 'ai-general-knowledge');
       let resourcesText = selectedResources.map(r => `=== ${r.title} ===\n${r.content}`).join('\n\n');
-      
       if (selectedResourceIds.includes('ai-general-knowledge')) {
-         resourcesText += '\n\n=== SYSTEM NOTE ===\nThe AI is authorized to use external general knowledge to complete this task.';
-      }
-      
-      const res = await fetch('/api/build-rubric', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ content: homeworkContent, resourcesText, userDraft: "None" })
-      });
-      
-      const rawText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 100)}`);
+        resourcesText += '\n\n=== SYSTEM NOTE ===\nThe AI is authorized to use external general knowledge to complete this task.';
       }
 
-      if (!res.ok || data.error) {
-        if (res.status === 401 || (data.error && typeof data.error === 'string' && data.error.includes('UNAUTHENTICATED'))) {
-          throw new Error('Invalid API Key. Please update your API key in the Dashboard Settings.');
-        }
-        throw new Error(data.error || res.statusText);
-      }
-      setRubricContent(data.rubric);
+      const rubric = await buildRubric({
+        content: homeworkContent,
+        resourcesText,
+        userDraft: 'None',
+        apiKey: apiKey || '',
+        apiModel: apiModel || 'gemini-2.0-flash',
+        customPrompts: settings?.prompts,
+      });
+      setRubricContent(rubric);
       addLog('Generated Grading Rubric');
     } catch (err: any) {
       showError(`Failed to generate rubric: ${err.message}`);
@@ -167,38 +123,23 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
 
   const handleRefineRubric = async () => {
     if (!tempRubric.trim()) {
-      showError("Please enter a base rubric first.");
+      showError('Please enter a base rubric first.');
       return;
     }
 
     setIsRefiningRubric(true);
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (apiKey) headers['x-api-key'] = apiKey;
-      if (apiModel) headers['x-api-model'] = apiModel;
-      
       const resourcesText = resources.filter(r => selectedResourceIds.includes(r.id)).map(r => r.content).join('\n\n');
-      
-      const res = await fetch('/api/build-rubric', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ 
-          content: homeworkContent,
-          resourcesText,
-          userDraft: tempRubric
-        })
+
+      const rubric = await buildRubric({
+        content: homeworkContent,
+        resourcesText,
+        userDraft: tempRubric,
+        apiKey: apiKey || '',
+        apiModel: apiModel || 'gemini-2.0-flash',
+        customPrompts: settings?.prompts,
       });
-      
-      const rawText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 100)}`);
-      }
-      if (!res.ok || data.error) throw new Error(data.error || res.statusText);
-      
-      setRubricContent(data.rubric);
+      setRubricContent(rubric);
       setActivePopup('none');
       setTempRubric('');
     } catch (err: any) {
@@ -219,21 +160,14 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
     if (existingHws.length > 0 && !similarityError) {
       setIsCheckingSimilarity(true);
       try {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (apiKey) headers['x-api-key'] = apiKey;
-        if (apiModel) headers['x-api-model'] = apiModel;
-        
-        const simRes = await fetch('/api/check-similarity', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ 
-            newHomework: homeworkContent,
-            existingHomeworks: existingHws
-          })
+        const simData = await checkSimilarity({
+          newHomework: homeworkContent,
+          existingHomeworks: existingHws,
+          apiKey: apiKey || '',
+          apiModel: apiModel || 'gemini-2.0-flash',
+          customPrompts: settings?.prompts,
         });
-        const simData = await simRes.json();
-        
-        if (simRes.ok && simData.similar) {
+        if (simData.similar) {
           setSimilarityError(`Looks like you already scheduled this homework task:\n${simData.reason}\n\nIf you want to schedule it anyway, edit the text slightly and try again.`);
           setIsCheckingSimilarity(false);
           return;
@@ -245,7 +179,7 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
     }
 
     setIsValidating(true);
-    
+
     // Auto-bypass validation if general knowledge is selected
     if (selectedResourceIds.includes('ai-general-knowledge')) {
       setIsValidating(false);
@@ -255,24 +189,16 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
 
     if (selectedResourceIds.length > 0) {
       try {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (apiKey) headers['x-api-key'] = apiKey;
-        if (apiModel) headers['x-api-model'] = apiModel;
-
         const selectedResources = resources.filter(r => selectedResourceIds.includes(r.id) && r.id !== 'ai-general-knowledge');
         const resourcesText = selectedResources.map(r => `=== ${r.title} ===\n${r.content}`).join('\n\n');
-        
-        const res = await fetch('/api/validate-homework', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ content: homeworkContent, resourcesText })
+
+        const data = await validateHomework({
+          content: homeworkContent,
+          resourcesText,
+          apiKey: apiKey || '',
+          apiModel: apiModel || 'gemini-2.0-flash',
+          customPrompts: settings?.prompts,
         });
-        
-        const data = await res.json();
-        
-        if (!res.ok) {
-          throw new Error(data.error || 'Failed to validate');
-        }
 
         if (!data.valid) {
           setValidationError(`Wait! Your homework task does not seem to be covered by the selected resources.\n\n${data.reason}\n\nPlease revise your homework task or select the correct resources in Step 1.`);
@@ -287,7 +213,7 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
         return;
       }
     }
-    
+
     setIsValidating(false);
     setStep(3);
   };

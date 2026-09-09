@@ -1,0 +1,225 @@
+@echo off
+setlocal enabledelayedexpansion
+title UNCODE Setup and Permissions Tool
+
+:: ============================================================================
+::                     USER CONFIGURATION / PREFERENCES
+::  Edit the values below (true or false) to tailor the setup to your needs.
+:: ============================================================================
+
+:: 1. Force re-install local APK even if already installed on device (default: false)
+set "FORCE_REINSTALL_APK=false"
+
+:: 2. Unlock Android 13/14+ Restricted Settings automatically via ADB
+set "BYPASS_RESTRICTED_SETTINGS=true"
+
+:: 3. Grant elevated system permissions (WRITE_SECURE_SETTINGS, DUMP)
+set "GRANT_SECURE_PERMISSIONS=true"
+
+:: 4. Whitelist UNCODE from aggressive OS battery savers (Samsung, Xiaomi, etc.)
+set "WHITELIST_BATTERY=true"
+
+:: 5. Automatically enable UNCODE's Accessibility Service via ADB
+set "ENABLE_ACCESSIBILITY=true"
+
+:: 6. Activate Device Administrator to prevent uninstallation during lockdown
+::    (100% realistic: works with all personal Google accounts logged in, no wipe needed)
+set "ACTIVATE_DEVICE_ADMIN=true"
+
+:: 7. Attempt Enterprise Device Owner mode (DEFAULT: false)
+::    (Unrealistic for everyday devices: requires root or removing all Google accounts)
+set "TRY_DEVICE_OWNER=false"
+
+:: 8. Automatically launch UNCODE on your phone after setup completes
+set "LAUNCH_APP_ON_FINISH=true"
+
+:: ============================================================================
+
+:: Check for Administrator privileges
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo Requesting Administrator privileges...
+    powershell.exe -Command "Start-Process cmd -ArgumentList '/k \"%~dpnx0\"' -Verb RunAs"
+    exit /b
+)
+
+:: Project directory
+set "PROJECT_DIR=%~dp0"
+
+echo.
+echo  ====================================================
+echo   UNCODE - Android Permission and Lockdown Setup
+echo  ====================================================
+echo.
+
+:: Check ADB is available
+adb.exe version >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] ADB not found. Make sure Android platform-tools is installed and in your PATH.
+    goto :end
+)
+
+:: Check device connected
+echo [1/6] Checking connected device...
+for /f "tokens=1" %%d in ('adb.exe devices ^| findstr /v "List" ^| findstr "device"') do set DEVICE=%%d
+if "!DEVICE!"=="" (
+    echo [ERROR] No device detected. Connect your phone via USB and enable USB Debugging.
+    goto :end
+)
+echo       Device found: !DEVICE!
+echo.
+
+:: [2/6] Check App Installation / APK Install
+echo [2/6] Checking UNCODE installation on device...
+set "APP_INSTALLED="
+for /f "tokens=*" %%p in ('adb.exe shell pm path com.uncode.app 2^>nul') do set "APP_INSTALLED=%%p"
+
+if not "!APP_INSTALLED!"=="" (
+    if /i "!FORCE_REINSTALL_APK!"=="true" (
+        echo       UNCODE is already on device, but FORCE_REINSTALL_APK is true.
+        goto :do_install
+    )
+    echo       UNCODE is already installed on your device.
+    echo       Proceeding directly to permissions setup...
+    goto :after_install
+)
+
+:do_install
+echo       UNCODE is not installed on your phone yet.
+echo       Searching for local APK to install...
+
+set "APK_PATH="
+if exist "%PROJECT_DIR%android\app\build\outputs\apk\debug\app-debug.apk" (
+    set "APK_PATH=%PROJECT_DIR%android\app\build\outputs\apk\debug\app-debug.apk"
+) else if exist "%PROJECT_DIR%app-debug.apk" (
+    set "APK_PATH=%PROJECT_DIR%app-debug.apk"
+) else if exist "%PROJECT_DIR%uncode.apk" (
+    set "APK_PATH=%PROJECT_DIR%uncode.apk"
+)
+
+if not "!APK_PATH!"=="" (
+    echo       Found local APK: !APK_PATH!
+    echo       Installing to phone via ADB...
+    adb.exe install -r "!APK_PATH!" >nul 2>&1
+    if errorlevel 1 (
+        echo       [ERROR] APK installation failed. Ensure your phone screen is unlocked.
+        goto :end
+    ) else (
+        echo       UNCODE installed successfully.
+    )
+) else (
+    echo.
+    echo  ========================================================================
+    echo   [ERROR] UNCODE is NOT installed on your phone and no APK was found!
+    echo  ========================================================================
+    echo.
+    echo   Please download and install UNCODE on your phone first from GitHub:
+    echo   https://github.com/Daisuki69/uncode/releases
+    echo.
+    echo   Once installed on your phone, re-run this script to configure permissions.
+    echo  ========================================================================
+    goto :end
+)
+
+:after_install
+echo.
+
+:: [3/6] Permissions & Restricted Settings
+echo [3/6] Configuring system permissions...
+if /i "!GRANT_SECURE_PERMISSIONS!"=="true" (
+    adb.exe shell pm grant com.uncode.app android.permission.WRITE_SECURE_SETTINGS >nul 2>&1
+    adb.exe shell pm grant com.uncode.app android.permission.DUMP >nul 2>&1
+    adb.exe shell pm grant com.uncode.app android.permission.POST_NOTIFICATIONS >nul 2>&1
+    echo       WRITE_SECURE_SETTINGS, DUMP, and POST_NOTIFICATIONS: GRANTED.
+) else (
+    echo       Secure permissions: SKIPPED [Configured: false].
+)
+
+if /i "!BYPASS_RESTRICTED_SETTINGS!"=="true" (
+    adb.exe shell appops set com.uncode.app ACCESS_RESTRICTED_SETTINGS allow >nul 2>&1
+    echo       Restricted settings: UNLOCKED via ADB.
+) else (
+    echo       Restricted settings unlock: SKIPPED [Configured: false].
+)
+echo.
+
+:: [4/6] Battery optimization whitelist
+if /i "!WHITELIST_BATTERY!"=="true" (
+    echo [4/6] Whitelisting from battery optimization...
+    adb.exe shell dumpsys deviceidle whitelist +com.uncode.app >nul 2>&1
+    echo       Battery whitelist OK.
+) else (
+    echo [4/6] Battery whitelist: SKIPPED [Configured: false].
+)
+echo.
+
+:: [5/6] Automatic Accessibility Service enablement via ADB
+if /i "!ENABLE_ACCESSIBILITY!"=="true" (
+    echo [5/6] Enabling Accessibility Service automatically...
+    adb.exe shell "settings put secure enabled_accessibility_services com.uncode.app/com.uncode.app.LockAccessibilityService:com.uncode.app/.LockAccessibilityService" >nul 2>&1
+    adb.exe shell "settings put secure accessibility_enabled 1" >nul 2>&1
+    echo       Accessibility Service enabled.
+) else (
+    echo [5/6] Accessibility Service: SKIPPED [Configured: false].
+)
+echo.
+
+:: [6/6] Device Administrator & Device Owner setup
+echo [6/6] Configuring Uninstall and Lockdown Protection...
+if /i "!ACTIVATE_DEVICE_ADMIN!"=="true" (
+    adb.exe shell dpm set-active-admin com.uncode.app/.AdminReceiver >nul 2>&1
+    if not errorlevel 1 (
+        echo       Device Administrator: ACTIVATED [Uninstall locked]
+    ) else (
+        echo       [INFO] Device Administrator prompt may appear on device screen.
+    )
+) else (
+    echo       Device Administrator: SKIPPED [Configured: false].
+)
+
+set DO_OK=0
+if /i "!TRY_DEVICE_OWNER!"=="true" (
+    echo       Attempting Device Owner activation...
+    adb.exe shell dpm set-device-owner com.uncode.app/.AdminReceiver >nul 2>&1
+    if not errorlevel 1 (
+        set DO_OK=1
+        echo       Device Owner: ACTIVATED [Enterprise full lockdown]
+    ) else (
+        echo       Device Owner: Bypassed [Device has existing accounts].
+    )
+) else (
+    echo       Device Owner: DISABLED [Using Device Admin mode, no account removal needed].
+)
+echo.
+
+:: Launch UNCODE
+if /i "!LAUNCH_APP_ON_FINISH!"=="true" (
+    echo Launching UNCODE...
+    adb.exe shell am start -n com.uncode.app/.MainActivity >nul 2>&1
+    echo.
+)
+
+echo  ====================================================
+echo   Setup Complete
+echo  ====================================================
+echo.
+echo   - App Blocking: Active via LockAccessibilityService
+echo   - Quick Settings: Blocked
+echo   - Camera and Gallery: Allowed for homework submission
+echo   - Notifications: Pre-granted via ADB
+if /i "!ACTIVATE_DEVICE_ADMIN!"=="true" (
+    echo   - Uninstall Protection: Active [Device Admin + Settings blocked]
+) else (
+    echo   - Uninstall Protection: Disabled by user config
+)
+if "!DO_OK!"=="1" (
+    echo   - Mode: FULL ENTERPRISE DEVICE OWNER
+) else (
+    echo   - Mode: HIGH-SECURITY DEVICE ADMIN [No accounts removed]
+)
+echo.
+
+:end
+echo ====================================================
+echo Press any key to exit.
+pause >nul

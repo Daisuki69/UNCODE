@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">UNCODE</string>
+    <string name="title_activity_main">UNCODE</string>
+    <string name="package_name">com.uncode.app</string>
+    <string name="custom_url_scheme">com.uncode.app</string>
+    <string name="accessibility_service_description">UNCODE uses this service to block Quick Settings access during study lockdown sessions. Notification shade remains accessible.</string>
+</resources>

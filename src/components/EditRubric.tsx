@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ScheduleData, SavedResource } from '../types';
 import { ArrowLeft, Sparkles, Pencil, Loader2, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { buildRubric } from '../api/buildRubric';
 
 interface EditRubricProps {
   schedule: ScheduleData;
@@ -24,35 +25,15 @@ export function EditRubric({ schedule, resources, apiKey, apiModel, role, onSave
   const handleGenerateRubric = async () => {
     setIsGeneratingRubric(true);
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (apiKey) headers['x-api-key'] = apiKey;
-      if (apiModel) headers['x-api-model'] = apiModel;
-
-      // In a real app we'd map back which resources were selected for this schedule,
-      // but for this simple version we'll just send all of them if that's what was provided,
-      // or we can prompt to select. For simplicity, we just use all resources, as the API limits might hit.
-      // Wait, let's just send all resources to keep it simple, or maybe none if it was empty.
       const resourcesText = resources.filter(r => schedule.selectedResourceIds.includes(r.id)).map(r => `=== ${r.title} ===\n${r.content}`).join('\n\n');
-      
-      const res = await fetch('/api/build-rubric', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ content: schedule.homeworkContent, resourcesText, userDraft: "None" })
+      const rubric = await buildRubric({
+        content: schedule.homeworkContent,
+        resourcesText,
+        userDraft: 'None',
+        apiKey: apiKey || '',
+        apiModel: apiModel || 'gemini-2.0-flash',
       });
-      const rawText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 100)}`);
-      }
-      if (!res.ok || data.error) {
-        if (res.status === 401 || (data.error && typeof data.error === 'string' && data.error.includes('UNAUTHENTICATED'))) {
-          throw new Error('Invalid API Key. Please update your API key in the Dashboard Settings.');
-        }
-        throw new Error(data.error || res.statusText);
-      }
-      setRubricContent(data.rubric);
+      setRubricContent(rubric);
     } catch (err: any) {
       showError(`Failed to generate rubric: ${err.message}`);
     } finally {
@@ -62,38 +43,21 @@ export function EditRubric({ schedule, resources, apiKey, apiModel, role, onSave
 
   const handleRefineRubric = async () => {
     if (!tempRubric.trim()) {
-      showError("Please enter a base rubric first.");
+      showError('Please enter a base rubric first.');
       return;
     }
 
     setIsRefiningRubric(true);
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (apiKey) headers['x-api-key'] = apiKey;
-      if (apiModel) headers['x-api-model'] = apiModel;
-      
       const resourcesText = resources.filter(r => schedule.selectedResourceIds.includes(r.id)).map(r => r.content).join('\n\n');
-
-      const res = await fetch('/api/build-rubric', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ 
-          content: schedule.homeworkContent,
-          resourcesText,
-          userDraft: tempRubric
-        })
+      const rubric = await buildRubric({
+        content: schedule.homeworkContent,
+        resourcesText,
+        userDraft: tempRubric,
+        apiKey: apiKey || '',
+        apiModel: apiModel || 'gemini-2.0-flash',
       });
-      
-      const rawText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        throw new Error(`Server returned non-JSON: ${rawText.substring(0, 100)}`);
-      }
-      if (!res.ok || data.error) throw new Error(data.error || res.statusText);
-      
-      setRubricContent(data.rubric);
+      setRubricContent(rubric);
       setActivePopup('none');
       setTempRubric('');
     } catch (err: any) {

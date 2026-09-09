@@ -11,6 +11,11 @@ import { HomeworksPage } from './components/HomeworksPage';
 import { Loader2, AlertTriangle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { startLockdown, endLockdown } from './systemBridge';
+import { evaluate } from './api/evaluate';
+import { declutterResource } from './api/declutterResource';
+import { PermissionWalkthrough } from './components/PermissionWalkthrough';
+import { checkPermissions } from './systemBridge';
+import { loadData, saveData } from './storage';
 
 const modalVariants = {
   initial: { opacity: 0 },
@@ -80,41 +85,18 @@ export default function App() {
     setAppState(newState);
   }, []);
 
-  const [appState, setAppState] = useState<AppState>(() => {
-    const saved = localStorage.getItem('studom_settings');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.onboardingComplete) return 'dashboard';
-    }
-    return 'onboarding';
-  });
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [appState, setAppState] = useState<AppState>('onboarding');
   
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('studom_settings');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Migrate old schedule to schedules array
-      if (parsed.schedule && !parsed.schedules) {
-        parsed.schedules = [{ ...parsed.schedule, id: crypto.randomUUID() }];
-        delete parsed.schedule;
-      } else if (!parsed.schedules) {
-        parsed.schedules = [];
-      }
-      return parsed;
-    }
-    return { 
-      onboardingComplete: false,
-      role: 'just a guy',
-      schedules: []
-    };
+  const [settings, setSettings] = useState<AppSettings>({ 
+    onboardingComplete: false,
+    role: 'just a guy',
+    schedules: []
   });
 
   const [evaluationResult, setEvaluationResult] = useState<IEvaluationResult | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [timeOffset, setTimeOffset] = useState<number>(() => {
-    const saved = localStorage.getItem('studom_timeOffset');
-    return saved ? parseInt(saved, 10) : 0;
-  });
+  const [timeOffset, setTimeOffset] = useState<number>(0);
 
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -123,8 +105,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('studom_timeOffset', timeOffset.toString());
-  }, [timeOffset]);
+    if (isLoaded) saveData('studom_timeOffset', timeOffset);
+  }, [timeOffset, isLoaded]);
 
   const [timeUntilLock, setTimeUntilLock] = useState<number | null>(null);
   const [nextActivationDate, setNextActivationDate] = useState<Date | null>(null);
@@ -132,6 +114,20 @@ export default function App() {
   const [lockPauseTime, setLockPauseTime] = useState<number | null>(null);
   const [activeScheduleId, setActiveScheduleId] = useState<string | null>(null);
   const [editingRubricScheduleId, setEditingRubricScheduleId] = useState<string | null>(null);
+
+  // Global Permission Checking (on mount and on resume)
+  useEffect(() => {
+    if (appState === 'onboarding' || appState === 'permission_walkthrough') return;
+    
+    const verify = async () => {
+      const perms = await checkPermissions();
+      if (!perms.isDeviceOwner && !perms.isAccessibilityEnabled) {
+        navigate('permission_walkthrough');
+      }
+    };
+    
+    verify();
+  }, [appState, navigate]);
 
   const resumeLock = () => {
     if (lockPauseTime && lockEndTime) {
@@ -141,22 +137,17 @@ export default function App() {
     navigate('locked');
   };
 
-  const [logs, setLogs] = useState<LogEntry[]>(() => {
-    const saved = localStorage.getItem('studom_logs');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('studom_logs', JSON.stringify(logs));
-  }, [logs]);
-  const [completedHomeworks, setCompletedHomeworks] = useState<import('./types').CompletedHomework[]>(() => {
-    const saved = localStorage.getItem('studom_completed_homeworks');
-    return saved ? JSON.parse(saved) : [];
-  });
+    if (isLoaded) saveData('studom_logs', logs);
+  }, [logs, isLoaded]);
+
+  const [completedHomeworks, setCompletedHomeworks] = useState<import('./types').CompletedHomework[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('studom_completed_homeworks', JSON.stringify(completedHomeworks));
-  }, [completedHomeworks]);
+    if (isLoaded) saveData('studom_completed_homeworks', completedHomeworks);
+  }, [completedHomeworks, isLoaded]);
 
 
   const addLog = (action: string, details?: string) => {
@@ -168,28 +159,57 @@ export default function App() {
     }, ...prev].slice(0, 500));
   };
 
-  const [resources, setResources] = useState<SavedResource[]>(() => {
-    const saved = localStorage.getItem('studom_resources');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [resources, setResources] = useState<SavedResource[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('studom_settings', JSON.stringify(settings));
-  }, [settings]);
+    if (isLoaded) saveData('studom_settings', settings);
+  }, [settings, isLoaded]);
 
   useEffect(() => {
-    localStorage.setItem('studom_resources', JSON.stringify(resources));
-  }, [resources]);
+    if (isLoaded) saveData('studom_resources', resources);
+  }, [resources, isLoaded]);
+
+  // Load all data on mount
+  useEffect(() => {
+    async function loadAll() {
+      const loadedSettings = await loadData<AppSettings>('studom_settings', { onboardingComplete: false, role: 'just a guy', schedules: [] });
+      
+      // Migrate old schedule
+      if ((loadedSettings as any).schedule && !loadedSettings.schedules) {
+        loadedSettings.schedules = [{ ...(loadedSettings as any).schedule, id: crypto.randomUUID() }];
+        delete (loadedSettings as any).schedule;
+      } else if (!loadedSettings.schedules) {
+        loadedSettings.schedules = [];
+      }
+
+      setSettings(loadedSettings);
+      setAppState(loadedSettings.onboardingComplete ? 'dashboard' : 'onboarding');
+      setResources(await loadData<SavedResource[]>('studom_resources', []));
+      setLogs(await loadData<LogEntry[]>('studom_logs', []));
+      setCompletedHomeworks(await loadData<import('./types').CompletedHomework[]>('studom_completed_homeworks', []));
+      setTimeOffset(await loadData<number>('studom_timeOffset', 0));
+      setIsLoaded(true);
+    }
+    loadAll();
+  }, []);
 
   const getCurrentTime = useCallback(() => Date.now() + timeOffset, [timeOffset]);
 
   useEffect(() => {
     const activeSchedules = settings.schedules?.filter(s => s.isActive) || [];
     
-    if (activeSchedules.length === 0 || appState !== 'dashboard') {
+    if (activeSchedules.length === 0) {
+      if (appState === 'locked') {
+        endLockdown();
+        navigate('dashboard');
+      }
       setTimeUntilLock(null);
       setNextActivationDate(null);
       return;
+    }
+
+    if (appState === 'create_schedule' || appState === 'edit_rubric') {
+      return; // Pause lock checking while editing schedules
     }
 
     const checkSchedule = () => {
@@ -228,7 +248,7 @@ export default function App() {
         if (inWindow) {
           setLockEndTime(lockEnd);
           setActiveScheduleId(schedule.id);
-          if (appState !== 'locked') {
+          if (appState !== 'locked' && appState !== 'evaluating' && appState !== 'result') {
             startLockdown(settings.allowedApps?.map(a => a.id) || []);
             navigate('locked');
           }
@@ -248,13 +268,19 @@ export default function App() {
         }
       }
 
-      if (!foundActive && nearestUpcomingTime !== null && nearestScheduleDate !== null) {
-        setNextActivationDate(nearestScheduleDate);
-        const diffSeconds = Math.max(0, Math.floor(nearestUpcomingTime / 1000));
-        setTimeUntilLock(diffSeconds);
+      if (!foundActive) {
+        if (appState === 'locked') {
+          endLockdown();
+          navigate('dashboard');
+        }
 
-        if (diffSeconds === 0) {
-          // It will lock on the next tick naturally
+        if (nearestUpcomingTime !== null && nearestScheduleDate !== null) {
+          setNextActivationDate(nearestScheduleDate);
+          const diffSeconds = Math.max(0, Math.floor(nearestUpcomingTime / 1000));
+          setTimeUntilLock(diffSeconds);
+        } else {
+          setTimeUntilLock(null);
+          setNextActivationDate(null);
         }
       }
     };
@@ -265,6 +291,7 @@ export default function App() {
   }, [settings.schedules, appState, timeOffset]);
 
   const notifyUser = (message: string) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
     if (Notification.permission === 'granted') {
       new Notification('UNCODE ALARM', { body: message });
     } else if (Notification.permission !== 'denied') {
@@ -353,6 +380,10 @@ export default function App() {
       alert("This image is too large (over 5MB). Please compress it or take a lower resolution photo before uploading.");
       return;
     }
+    if (!transcribedText) {
+      setGlobalError('Evaluation Error: No transcribed text found. Please run OCR first.');
+      return;
+    }
     setLockPauseTime(Date.now());
     navigate('evaluating');
     setIsEvaluating(true);
@@ -360,53 +391,14 @@ export default function App() {
     const activeSchedule = settings.schedules?.find(s => s.id === scheduleId);
 
     try {
-      const formData = new FormData();
-      formData.append('homeworkImage', file);
-      formData.append('resources', activeSchedule?.rubricContent || '');
-      formData.append('role', settings.role);
-      if (transcribedText) formData.append('transcribedText', transcribedText);
-
-      const headers: Record<string, string> = {};
-      if (settings.apiModel) {
-        headers['x-api-model'] = settings.apiModel;
-      }
-      if (settings.apiKey) {
-        headers['x-api-key'] = settings.apiKey;
-      }
-      if (settings.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
-      if (settings.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
-      headers['x-ocr-type'] = ocrType;
-
-      const res = await fetch('/api/evaluate', {
-        method: 'POST',
-        headers,
-        body: formData,
+      const data = await evaluate({
+        transcribedText,
+        rubric: activeSchedule?.rubricContent || '',
+        apiKey: settings.apiKey || '',
+        apiModel: settings.apiModel || 'gemini-2.0-flash',
+        customPrompts: settings.prompts,
       });
-      
-      const rawText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        console.error("Failed to parse response as JSON. Raw text:", rawText.substring(0, 200));
-        if (!res.ok) {
-          throw new Error(`Server error (${res.status}): The server returned an invalid response. Please try again.`);
-        } else {
-          throw new Error(`Unexpected response format from server. Please try again.`);
-        }
-      }
 
-      if (!res.ok) {
-        if (res.status === 413) {
-          throw new Error('The image file is too large. Please compress it or take a lower resolution photo.');
-        }
-        if (res.status === 401 || (data.error && data.error.includes('UNAUTHENTICATED'))) {
-          throw new Error('Invalid API Key. Please update your API key in the Settings overlay.');
-        }
-        throw new Error(data.error || 'Evaluation failed');
-      }
-      
-      
       setEvaluationResult(data);
       setCompletedHomeworks(prev => [{
         id: crypto.randomUUID(),
@@ -424,32 +416,24 @@ export default function App() {
         if (activeSchedule?.selectedResourceIds?.includes('ai-general-knowledge')) {
           const textToHarvest = activeSchedule.aiAnswer || transcribedText || data.transcribedText;
           if (textToHarvest) {
-            try {
-              // Background call to declutter and save
-              const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-              if (settings.apiKey) headers['x-api-key'] = settings.apiKey;
-              if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
-              
-              fetch('/api/declutter-resource', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ title: "AI Research: " + (activeSchedule.title || "Topic"), content: textToHarvest })
-              }).then(res => res.json()).then(harvestData => {
-                const realResources = activeSchedule.selectedResourceIds.filter(id => id !== 'ai-general-knowledge');
-                if (realResources.length > 0) {
-                  // Append to existing
-                  setResources(prev => prev.map(r => r.id === realResources[0] ? { ...r, content: r.content + '\n\n' + harvestData.content } : r));
-                } else {
-                  // Create new
-                  setResources(prev => [...prev, { id: crypto.randomUUID(), title: harvestData.title || "AI Research", content: harvestData.content, createdAt: Date.now() }]);
-                }
-              }).catch(console.error);
-            } catch (e) {
-              console.error("Auto harvest failed", e);
-            }
+            // Background call to declutter and save
+            declutterResource({
+              title: 'AI Research: ' + (activeSchedule.title || 'Topic'),
+              content: textToHarvest,
+              apiKey: settings.apiKey || '',
+              apiModel: settings.apiModel || 'gemini-2.0-flash',
+              customPrompts: settings.prompts,
+            }).then(harvestData => {
+              const realResources = activeSchedule.selectedResourceIds!.filter(id => id !== 'ai-general-knowledge');
+              if (realResources.length > 0) {
+                setResources(prev => prev.map(r => r.id === realResources[0] ? { ...r, content: r.content + '\n\n' + harvestData.content } : r));
+              } else {
+                setResources(prev => [...prev, { id: crypto.randomUUID(), title: harvestData.title || 'AI Research', content: harvestData.content, createdAt: Date.now() }]);
+              }
+            }).catch(console.error);
           }
         }
-        
+
         // Only clean up the lockscreen data if the student passed
         localStorage.removeItem(`lockscreen_data_${scheduleId}`);
         endLockdown(); // Release the OS lock!
@@ -458,7 +442,7 @@ export default function App() {
         navigate('result');
       }
     } catch (error: any) {
-      setGlobalError(`Evaluation Error: ${error.message || "Unknown error"}`);
+      setGlobalError(`Evaluation Error: ${error.message || 'Unknown error'}`);
       resumeLock();
     } finally {
       setIsEvaluating(false);
@@ -473,6 +457,15 @@ export default function App() {
   };
 
   const zoomStyle = settings.uiScale && settings.uiScale !== 100 ? { zoom: `${settings.uiScale}%` } as any : {};
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center text-red-500 font-black">
+        <Loader2 className="w-12 h-12 animate-spin mb-4" />
+        <span className="uppercase tracking-widest text-xs font-bold text-gray-500">Decrypting UNCODE...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans selection:bg-red-200 overflow-hidden" style={zoomStyle}>
@@ -614,7 +607,12 @@ export default function App() {
 
         
 
-        
+        {appState === 'permission_walkthrough' && (
+          <motion.div key="permission_walkthrough" custom={navDirection} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3, ease: 'easeOut' }} className="absolute inset-0 overflow-y-auto flex flex-col w-full h-full z-50">
+            <PermissionWalkthrough onComplete={() => navigate('dashboard')} />
+          </motion.div>
+        )}
+
         </AnimatePresence>
       </div>
 

@@ -1,4 +1,4 @@
-export type AppState = 'onboarding' | 'dashboard' | 'create_schedule' | 'locked' | 'evaluating' | 'result' | 'settings' | 'edit_rubric';
+export type AppState = 'onboarding' | 'dashboard' | 'create_schedule' | 'locked' | 'evaluating' | 'result' | 'settings' | 'edit_rubric' | 'permission_walkthrough';
 
 export interface SavedResource {
   id: string;
@@ -25,6 +25,7 @@ export interface AllowedApp {
   id: string;
   name: string;
   iconName: string;
+  iconBase64?: string;
 }
 
 export interface AppSettings {

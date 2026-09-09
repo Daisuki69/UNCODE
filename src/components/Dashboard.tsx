@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, BookOpen, Trash2, Plus, Sparkles, Pencil, Upload, Loader2, Settings, ShieldAlert, X, GitMerge, FileText, Calculator, Music, Globe, MessageSquare, MonitorPlay, Check, LayoutGrid } from 'lucide-react';
 import { AppSettings, SavedResource, ScheduleData, AllowedApp } from '../types';
 import { getInstalledApps } from '../systemBridge';
+import { parseResource } from '../api/parseResource';
+import { declutterResource } from '../api/declutterResource';
 
 interface DashboardProps {
   settings: AppSettings;
@@ -72,14 +74,23 @@ export function Dashboard({
   onSettingsChange
 }: DashboardProps) {
   const [isAppSelectorOpen, setIsAppSelectorOpen] = useState(false);
-  const [availableApps, setAvailableApps] = useState<AllowedApp[]>(SIMULATED_APPS);
+  const [availableApps, setAvailableApps] = useState<AllowedApp[]>([]);
+  const [isLoadingApps, setIsLoadingApps] = useState(false);
   
   useEffect(() => {
     if (isAppSelectorOpen) {
+      setIsLoadingApps(true);
       getInstalledApps().then(nativeApps => {
         if (nativeApps && nativeApps.length > 0) {
           setAvailableApps(nativeApps);
+        } else {
+          // Dev/web fallback only — on real Android this should always return apps
+          setAvailableApps(SIMULATED_APPS);
         }
+        setIsLoadingApps(false);
+      }).catch(() => {
+        setAvailableApps(SIMULATED_APPS);
+        setIsLoadingApps(false);
       });
     }
   }, [isAppSelectorOpen]);
@@ -134,42 +145,26 @@ export function Dashboard({
 
     try {
       if (settings.apiKey) {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        headers['x-api-key'] = settings.apiKey;
-        if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
-      if (settings.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
-      if (settings.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
-      if (settings.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
-      headers['x-ocr-type'] = ocrType;
-
-        const res = await fetch('/api/declutter-resource', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ title: newResTitle, content: newResContent })
+        const data = await declutterResource({
+          title: newResTitle,
+          content: newResContent,
+          apiKey: settings.apiKey,
+          apiModel: settings.apiModel || 'gemini-2.0-flash',
+          customPrompts: settings.prompts,
         });
-        
-        const data = await res.json();
-        if (res.ok && !data.error) {
-          if (!newResTitle.trim() && data.title) finalTitle = data.title;
-          if (data.content) finalContent = data.content;
-        } else {
-          console.error("Declutter AI error", data.error);
-          
-          let errMsg = data.error;
-          if (typeof errMsg === 'object') {
-             errMsg = errMsg.message || JSON.stringify(errMsg);
-          }
-          if (errMsg && (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota'))) {
-            showError("AI Rate Limit Exceeded. Your resource was NOT saved. Please wait a minute or update your API Key.");
-          } else {
-            showError(`AI Error: ${errMsg || 'Failed to clean up.'} Your resource was NOT saved.`);
-          }
-          setIsDecluttering(false);
-          return; // Stop the save process entirely
-        }
+        if (!newResTitle.trim() && data.title) finalTitle = data.title;
+        if (data.content) finalContent = data.content;
       }
     } catch (err: any) {
       console.error('Error in declutter:', err);
+      let errMsg = err.message || 'Failed to clean up.';
+      if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota')) {
+        showError('AI Rate Limit Exceeded. Your resource was NOT saved. Please wait a minute or update your API Key.');
+      } else {
+        showError(`AI Error: ${errMsg} Your resource was NOT saved.`);
+      }
+      setIsDecluttering(false);
+      return;
     } finally {
       setIsDecluttering(false);
     }
@@ -194,47 +189,19 @@ export function Dashboard({
     }
 
     setIsParsing(true);
-    const formData = new FormData();
-    formData.append('document', file);
-    formData.append('type', 'transcription'); // Dump raw OCR text for manual review before cleanup
-
     try {
-      const headers: Record<string, string> = {};
-      if (settings.apiKey) headers['x-api-key'] = settings.apiKey;
-      if (settings.apiModel) headers['x-api-model'] = settings.apiModel;
-      if (settings.prompts) headers['x-custom-prompts'] = JSON.stringify(settings.prompts);
-
-      if (settings.simpleOcrKey) headers['x-simple-ocr-key'] = settings.simpleOcrKey;
-      if (settings.formattedOcrKey) headers['x-formatted-ocr-key'] = settings.formattedOcrKey;
-      headers['x-ocr-type'] = ocrType;
-      const res = await fetch('/api/parse-resource', { 
-        method: 'POST', 
-        headers,
-        body: formData 
+      const data = await parseResource({
+        file,
+        type: 'transcription',
+        apiKey: settings.apiKey || '',
+        apiModel: settings.apiModel || 'gemini-2.0-flash',
+        ocrType,
+        simpleOcrKey: settings.simpleOcrKey || '',
+        formattedOcrKey: settings.formattedOcrKey || '',
+        customPrompts: settings.prompts,
       });
-      
-      let data;
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        if (res.status === 413) {
-           throw new Error('File is too large. Please upload a smaller file (under 30MB).');
-        }
-        if (text.includes('<!doctype html>') || text.includes('<!DOCTYPE html>')) {
-          throw new Error('Server returned an unexpected page (possibly due to a proxy or cold start). Please try your upload again.');
-        }
-        throw new Error(`Server returned unexpected response (${res.status}): ${text.substring(0, 50)}...`);
-      }
-      
-      if (!res.ok || data.error) {
-        if (res.status === 401 || (data.error && typeof data.error === 'string' && data.error.includes('UNAUTHENTICATED'))) {
-          throw new Error('Invalid API Key. Please update your API key in the Dashboard Settings.');
-        }
-        throw new Error(data.error || res.statusText);
-      }
-      
+
+      if (data.error) throw new Error(data.error);
       setNewResContent(data.content);
       // Leave title empty as requested
     } catch (err: any) {
@@ -277,7 +244,7 @@ export function Dashboard({
             animate="animate"
             exit="exit"
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="max-w-4xl mx-auto w-full p-6 flex flex-col min-h-[calc(100vh-80px)] absolute inset-0 bg-gray-50"
+          className="max-w-4xl mx-auto w-full p-6 flex flex-col absolute inset-0 bg-gray-50 overflow-y-auto"
           >
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-black text-gray-900">
@@ -792,8 +759,12 @@ export function Dashboard({
                   >
                     <X className="w-3 h-3" />
                   </button>
-                  <div className="w-16 h-16 bg-gray-100 border border-gray-200 rounded-2xl flex items-center justify-center mb-2 group-hover:bg-gray-200 transition-colors shadow-sm">
-                    <RenderIcon className="w-8 h-8 text-gray-700" />
+                  <div className="w-16 h-16 bg-white border border-gray-200 rounded-2xl flex items-center justify-center mb-2 group-hover:bg-gray-50 transition-colors shadow-sm overflow-hidden relative">
+                    {app.iconBase64 ? (
+                      <img src={`data:image/png;base64,${app.iconBase64}`} alt={app.name} className="w-full h-full object-cover p-1.5" />
+                    ) : (
+                      <RenderIcon className="w-8 h-8 text-gray-700" />
+                    )}
                   </div>
                   <span className="text-xs font-semibold text-gray-700 w-16 text-center truncate">{app.name}</span>
                 </div>
@@ -806,8 +777,8 @@ export function Dashboard({
       {/* App Selector Modal */}
       <AnimatePresence>
         {isAppSelectorOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl p-8 max-w-lg w-full flex flex-col shadow-2xl overflow-hidden">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" style={{ paddingBottom: 'calc(1rem + var(--safe-bottom))', paddingTop: 'calc(1rem + var(--safe-top))' }}>
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl p-6 max-w-lg w-full flex flex-col shadow-2xl overflow-hidden max-h-[85vh]">
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-xl font-black text-gray-900">Select Allowed Apps</h3>
@@ -818,49 +789,60 @@ export function Dashboard({
                 </button>
               </div>
               
-              <div className="grid grid-cols-4 sm:grid-cols-5 gap-y-6 gap-x-4 max-h-[60vh] overflow-y-auto py-2">
-                {availableApps.map((simApp) => {
-                  const iconMap: Record<string, React.ElementType> = {
-                    'Calculator': Calculator,
-                    'FileText': FileText,
-                    'Music': Music,
-                    'Globe': Globe,
-                    'BookOpen': BookOpen,
-                    'MessageSquare': MessageSquare,
-                    'MonitorPlay': MonitorPlay
-                  };
-                  const RenderIcon = iconMap[simApp.iconName] || LayoutGrid;
-                  const isSelected = (settings.allowedApps || []).some(a => a.id === simApp.id);
-                  
-                  return (
-                    <div 
-                      key={simApp.id}
-                      onClick={() => {
-                        if (!onSettingsChange) return;
-                        const current = settings.allowedApps || [];
-                        if (isSelected) {
-                          onSettingsChange({ allowedApps: current.filter(a => a.id !== simApp.id) });
-                        } else {
-                          onSettingsChange({ allowedApps: [...current, simApp] });
-                        }
-                      }}
-                      className="flex flex-col items-center cursor-pointer group"
-                    >
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-2 transition-all relative ${isSelected ? 'bg-blue-50 border-2 border-blue-500 text-blue-600 shadow-sm' : 'bg-gray-50 border border-gray-200 text-gray-500 hover:border-gray-400 hover:shadow-sm'}`}>
-                        {isSelected && (
-                          <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 border-2 border-white">
-                            <Check className="w-2.5 h-2.5" />
-                          </div>
-                        )}
-                        <RenderIcon className="w-7 h-7" />
+              {isLoadingApps ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                  <p className="text-sm text-gray-500 font-medium">Loading installed apps...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-y-6 gap-x-4 overflow-y-auto py-2 flex-1 pr-1">
+                  {availableApps.map((simApp) => {
+                    const iconMap: Record<string, React.ElementType> = {
+                      'Calculator': Calculator,
+                      'FileText': FileText,
+                      'Music': Music,
+                      'Globe': Globe,
+                      'BookOpen': BookOpen,
+                      'MessageSquare': MessageSquare,
+                      'MonitorPlay': MonitorPlay
+                    };
+                    const RenderIcon = iconMap[simApp.iconName] || LayoutGrid;
+                    const isSelected = (settings.allowedApps || []).some(a => a.id === simApp.id);
+                    
+                    return (
+                      <div 
+                        key={simApp.id}
+                        onClick={() => {
+                          if (!onSettingsChange) return;
+                          const current = settings.allowedApps || [];
+                          if (isSelected) {
+                            onSettingsChange({ allowedApps: current.filter(a => a.id !== simApp.id) });
+                          } else {
+                            onSettingsChange({ allowedApps: [...current, simApp] });
+                          }
+                        }}
+                        className="flex flex-col items-center cursor-pointer group"
+                      >
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-2 transition-all relative overflow-hidden ${isSelected ? 'bg-blue-50 border-2 border-blue-500 text-blue-600 shadow-sm' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:shadow-sm'}`}>
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 border-2 border-white z-10">
+                              <Check className="w-2.5 h-2.5" />
+                            </div>
+                          )}
+                          {simApp.iconBase64 ? (
+                            <img src={`data:image/png;base64,${simApp.iconBase64}`} alt={simApp.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <RenderIcon className="w-7 h-7" />
+                          )}
+                        </div>
+                        <span className={`text-[10px] font-bold text-center w-full truncate px-1 ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>{simApp.name}</span>
                       </div>
-                      <span className={`text-[10px] font-bold text-center w-full truncate px-1 ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>{simApp.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
               
-              <div className="mt-8 flex justify-end">
+              <div className="mt-6 flex justify-end pt-4 border-t border-gray-100">
                 <button 
                   onClick={() => setIsAppSelectorOpen(false)}
                   className="px-6 py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-xl transition-colors"
