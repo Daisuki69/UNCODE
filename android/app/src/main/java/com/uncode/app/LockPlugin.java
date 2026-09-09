@@ -37,6 +37,11 @@ import java.io.OutputStream;
 import java.io.InputStream;
 import android.view.accessibility.AccessibilityManager;
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.content.pm.ResolveInfo;
+import android.provider.MediaStore;
+import android.provider.Settings;
+import android.view.inputmethod.InputMethodManager;
+import android.view.inputmethod.InputMethodInfo;
 
 @CapacitorPlugin(name = "LockPlugin")
 public class LockPlugin extends Plugin {
@@ -61,9 +66,40 @@ public class LockPlugin extends Plugin {
 
             Set<String> whitelist = new HashSet<>();
             whitelist.add(getActivity().getPackageName()); // Always allow QIEZKA itself
+
+            // Always silently whitelist all system and third-party keyboards so typing never bricks lockdown
+            try {
+                String defaultIme = Settings.Secure.getString(getActivity().getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+                if (defaultIme != null && defaultIme.contains("/")) {
+                    whitelist.add(defaultIme.split("/")[0]);
+                }
+                InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    List<InputMethodInfo> imis = imm.getInputMethodList();
+                    if (imis != null) {
+                        for (InputMethodInfo imi : imis) {
+                            if (imi != null && imi.getPackageName() != null) {
+                                whitelist.add(imi.getPackageName());
+                            }
+                        }
+                    }
+                    List<InputMethodInfo> enabledImis = imm.getEnabledInputMethodList();
+                    if (enabledImis != null) {
+                        for (InputMethodInfo imi : enabledImis) {
+                            if (imi != null && imi.getPackageName() != null) {
+                                whitelist.add(imi.getPackageName());
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignore) {}
+
             if (allowedAppIds != null) {
                 for (int i = 0; i < allowedAppIds.length(); i++) {
-                    whitelist.add(allowedAppIds.getString(i));
+                    String appId = allowedAppIds.getString(i);
+                    if (appId != null && !BlacklistConstants.isBlacklisted(appId)) {
+                        whitelist.add(appId);
+                    }
                 }
             }
 
@@ -115,13 +151,38 @@ public class LockPlugin extends Plugin {
             List<ApplicationInfo> installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
 
             JSArray apps = new JSArray();
+            Set<String> addedPackages = new HashSet<>();
             for (ApplicationInfo info : installedApps) {
+                if (info.packageName == null || info.packageName.equals(getActivity().getPackageName())) {
+                    continue;
+                }
+                if (BlacklistConstants.isBlacklisted(info.packageName)) {
+                    continue; // Strictly omit blacklisted distracting apps from selection
+                }
+                if (isKeyboardApp(info.packageName)) {
+                    continue; // Keyboards are silent infrastructure exemptions, never show in allowed apps section or modal
+                }
+
                 boolean isSystemApp = (info.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
-                if (!isSystemApp && !info.packageName.equals(getActivity().getPackageName())) {
+                boolean isLaunchable = pm.getLaunchIntentForPackage(info.packageName) != null;
+                boolean isBrowser = isBrowserApp(info.packageName);
+                boolean isMusic = isMusicApp(info.packageName);
+                boolean isCamera = isCameraApp(info.packageName);
+                boolean isHardcoded = isBrowser || isMusic || isCamera;
+
+                // Include user-installed apps, and any system app that is either launchable (like Chrome, Camera, Samsung Internet) or hardcoded exempt
+                if (!isSystemApp || isLaunchable || isHardcoded) {
+                    if (addedPackages.contains(info.packageName)) continue;
+                    addedPackages.add(info.packageName);
+
                     JSObject app = new JSObject();
                     app.put("id", info.packageName);
                     app.put("name", pm.getApplicationLabel(info).toString());
-                    app.put("iconName", "LayoutGrid"); // Fallback for web UI
+                    app.put("iconName", isBrowser ? "Globe" : (isMusic ? "Music" : (isCamera ? "Camera" : "LayoutGrid")));
+                    app.put("isHardcoded", isHardcoded);
+                    app.put("isBrowser", isBrowser);
+                    app.put("isMusic", isMusic);
+                    app.put("isCamera", isCamera);
                     
                     try {
                         Drawable icon = pm.getApplicationIcon(info);
@@ -142,6 +203,86 @@ public class LockPlugin extends Plugin {
             Log.e(TAG, "getInstalledApps failed", e);
             call.reject("getInstalledApps failed: " + e.getMessage());
         }
+    }
+
+    private boolean isBrowserApp(String packageName) {
+        if (packageName == null) return false;
+        String lower = packageName.toLowerCase();
+        if (lower.contains("chrome") || lower.contains("browser") || lower.contains("firefox") || lower.contains("opera") || lower.contains("brave") || lower.contains("duckduckgo")) return true;
+        try {
+            PackageManager pm = getActivity().getPackageManager();
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"));
+            intent.addCategory(Intent.CATEGORY_BROWSABLE);
+            List<ResolveInfo> list = pm.queryIntentActivities(intent, 0);
+            for (ResolveInfo r : list) {
+                if (r.activityInfo != null && packageName.equals(r.activityInfo.packageName)) return true;
+            }
+        } catch (Exception ignore) {}
+        return false;
+    }
+
+    private boolean isMusicApp(String packageName) {
+        if (packageName == null) return false;
+        String lower = packageName.toLowerCase();
+        if (lower.contains("music") || lower.contains("spotify") || lower.contains("tidal") || lower.contains("deezer") || lower.contains("soundcloud") || lower.contains("aspiro")) return true;
+        try {
+            PackageManager pm = getActivity().getPackageManager();
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_APP_MUSIC);
+            List<ResolveInfo> list = pm.queryIntentActivities(intent, 0);
+            for (ResolveInfo r : list) {
+                if (r.activityInfo != null && packageName.equals(r.activityInfo.packageName)) return true;
+            }
+        } catch (Exception ignore) {}
+        return false;
+    }
+
+    private boolean isCameraApp(String packageName) {
+        if (packageName == null) return false;
+        String lower = packageName.toLowerCase();
+        if (lower.contains("camera")) return true;
+        try {
+            PackageManager pm = getActivity().getPackageManager();
+            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            List<ResolveInfo> list = pm.queryIntentActivities(intent, 0);
+            for (ResolveInfo r : list) {
+                if (r.activityInfo != null && packageName.equals(r.activityInfo.packageName)) return true;
+            }
+        } catch (Exception ignore) {}
+        return false;
+    }
+
+    private boolean isKeyboardApp(String packageName) {
+        if (packageName == null) return false;
+        String lower = packageName.toLowerCase();
+        if (lower.contains("inputmethod") || 
+            lower.contains("honeyboard") || 
+            lower.contains("keyboard") || 
+            lower.contains("gboard") || 
+            lower.contains("swiftkey") || 
+            lower.contains(".ime")) {
+            return true;
+        }
+        try {
+            String defaultIme = Settings.Secure.getString(getActivity().getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+            if (defaultIme != null && defaultIme.startsWith(packageName + "/")) {
+                return true;
+            }
+        } catch (Exception ignore) {}
+        try {
+            InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                List<InputMethodInfo> imis = imm.getInputMethodList();
+                if (imis != null) {
+                    for (InputMethodInfo imi : imis) {
+                        if (imi != null && packageName.equals(imi.getPackageName())) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignore) {}
+        return false;
     }
 
     private String getBase64Icon(Drawable icon) {

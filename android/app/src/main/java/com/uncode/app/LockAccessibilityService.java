@@ -8,8 +8,12 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.provider.MediaStore;
+import android.provider.Settings;
+import android.net.Uri;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.inputmethod.InputMethodManager;
+import android.view.inputmethod.InputMethodInfo;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -98,7 +102,52 @@ public class LockAccessibilityService extends AccessibilityService {
         "com.vivo.FileManager"
     ));
 
+    /**
+     * Known Music & Audio player packages that are hardcoded to be allowed during lock.
+     */
+    private static final Set<String> KNOWN_MUSIC_APPS = new HashSet<>(Arrays.asList(
+        "com.spotify.music",
+        "com.google.android.apps.youtube.music",
+        "com.apple.android.music",
+        "com.amazon.mp3",
+        "com.aspiro.tidal",
+        "deezer.android.app",
+        "com.soundcloud.android",
+        "com.sec.android.app.music",
+        "com.miui.player",
+        "com.android.music",
+        "com.oppo.music",
+        "com.vivo.musicplayer"
+    ));
+
+    /**
+     * Common OEM and popular third-party keyboard packages (Input Method Editors).
+     * These are permanently hardcoded as exempt to prevent the device from bricking during typing.
+     */
+    private static final Set<String> KNOWN_KEYBOARDS = new HashSet<>(Arrays.asList(
+        "com.google.android.inputmethod.latin", // Gboard
+        "com.samsung.android.honeyboard",       // Samsung Keyboard
+        "com.touchtype.swiftkey",              // Microsoft SwiftKey
+        "com.touchtype.swiftkey.beta",
+        "com.android.inputmethod.latin",        // AOSP Keyboard
+        "com.miui.voiceassist",
+        "com.sohu.inputmethod.sogou.xiaomi",
+        "com.huawei.ohos.inputmethod",
+        "com.oppo.keyboard",
+        "com.coloros.keyboard",
+        "com.vivo.keyboard",
+        "com.syntellia.fleksy.keyboard",
+        "org.pocketworkstation.pckeyboard",
+        "org.dslul.openboard.inputmethod.latin",
+        "com.menny.android.anysoftkeyboard",
+        "com.grammarly.android.keyboard",
+        "com.baidu.input",
+        "com.sohu.inputmethod.sogou",
+        "com.google.android.tts"                // Google Speech Services / Voice Typing IME
+    ));
+
     private final Set<String> dynamicExemptPackages = new HashSet<>();
+    private final Set<String> dynamicKeyboardPackages = new HashSet<>();
     private SharedPreferences prefs;
 
     @Override
@@ -155,10 +204,93 @@ public class LockAccessibilityService extends AccessibilityService {
                     dynamicExemptPackages.add(info.activityInfo.packageName);
                 }
             }
-            Log.d(TAG, "Discovered dynamic exempt media/file packages: " + dynamicExemptPackages.size());
+
+            // Web browser handlers (always hardcoded to be allowed during lockdown)
+            try {
+                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"));
+                browserIntent.addCategory(Intent.CATEGORY_BROWSABLE);
+                List<ResolveInfo> browserApps = pm.queryIntentActivities(browserIntent, 0);
+                for (ResolveInfo info : browserApps) {
+                    if (info.activityInfo != null && info.activityInfo.packageName != null) {
+                        String bPkg = info.activityInfo.packageName;
+                        if (!BlacklistConstants.isBlacklisted(bPkg)) {
+                            dynamicExemptPackages.add(bPkg);
+                        }
+                    }
+                }
+            } catch (Exception ignore) {}
+
+            // Music / Audio player category handlers
+            try {
+                Intent musicIntent = new Intent(Intent.ACTION_MAIN);
+                musicIntent.addCategory(Intent.CATEGORY_APP_MUSIC);
+                List<ResolveInfo> musicApps = pm.queryIntentActivities(musicIntent, 0);
+                for (ResolveInfo info : musicApps) {
+                    if (info.activityInfo != null && info.activityInfo.packageName != null) {
+                        String mPkg = info.activityInfo.packageName;
+                        if (!BlacklistConstants.isBlacklisted(mPkg)) {
+                            dynamicExemptPackages.add(mPkg);
+                        }
+                    }
+                }
+            } catch (Exception ignore) {}
+
+            // ── Input Method Editors (Keyboards) handlers ──
+            try {
+                // Query active/default IME from Settings
+                String defaultIme = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+                if (defaultIme != null && defaultIme.contains("/")) {
+                    String defaultImePkg = defaultIme.split("/")[0];
+                    dynamicKeyboardPackages.add(defaultImePkg);
+                }
+
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    List<InputMethodInfo> imis = imm.getInputMethodList();
+                    if (imis != null) {
+                        for (InputMethodInfo imi : imis) {
+                            if (imi != null && imi.getPackageName() != null) {
+                                dynamicKeyboardPackages.add(imi.getPackageName());
+                            }
+                        }
+                    }
+                    List<InputMethodInfo> enabledImis = imm.getEnabledInputMethodList();
+                    if (enabledImis != null) {
+                        for (InputMethodInfo imi : enabledImis) {
+                            if (imi != null && imi.getPackageName() != null) {
+                                dynamicKeyboardPackages.add(imi.getPackageName());
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignore) {}
+
+            Log.d(TAG, "Discovered dynamic exempt packages: media=" + dynamicExemptPackages.size() + ", keyboards=" + dynamicKeyboardPackages.size());
         } catch (Exception e) {
-            Log.w(TAG, "Error resolving dynamic media packages: " + e.getMessage());
+            Log.w(TAG, "Error resolving dynamic media/keyboard packages: " + e.getMessage());
         }
+    }
+
+    private boolean isKeyboardApp(String pkg) {
+        if (pkg == null) return false;
+        if (KNOWN_KEYBOARDS.contains(pkg) || dynamicKeyboardPackages.contains(pkg)) return true;
+        String lower = pkg.toLowerCase();
+        if (lower.contains("inputmethod") || 
+            lower.contains("honeyboard") || 
+            lower.contains("keyboard") || 
+            lower.contains("gboard") || 
+            lower.contains("swiftkey") || 
+            lower.contains(".ime")) {
+            return true;
+        }
+        try {
+            String defaultIme = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+            if (defaultIme != null && defaultIme.startsWith(pkg + "/")) {
+                dynamicKeyboardPackages.add(pkg);
+                return true;
+            }
+        } catch (Exception ignore) {}
+        return false;
     }
 
     @Override
@@ -183,17 +315,25 @@ public class LockAccessibilityService extends AccessibilityService {
         // ── Foreground app blocking ──
         if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
 
-        // Always exempt our own app and core OS
+        // Always exempt our own app, core OS, and soft keyboards
         if (pkg.equals(getPackageName())) return;
         if (ALWAYS_EXEMPT.contains(pkg)) return;
+        if (isKeyboardApp(pkg)) return;
+
+        // ── Hardcoded Distraction Blacklist Check (Strictly Takes Precedence) ──
+        if (BlacklistConstants.isBlacklisted(pkg)) {
+            Log.w(TAG, "Blocked hardcoded distracting app: " + pkg + " — sending to Home");
+            goHome();
+            return;
+        }
 
         // Always allow known launchers (home screen)
         if (KNOWN_LAUNCHERS.contains(pkg)) return;
 
-        // Always allow Camera, Gallery, and File pickers so user can submit homework
-        if (MEDIA_AND_FILE_EXEMPT.contains(pkg) || dynamicExemptPackages.contains(pkg)) return;
+        // Always allow Camera, Gallery, File pickers, Web Browsers, and Music Players
+        if (MEDIA_AND_FILE_EXEMPT.contains(pkg) || dynamicExemptPackages.contains(pkg) || KNOWN_MUSIC_APPS.contains(pkg)) return;
 
-        // Check against user-defined whitelist
+        // Check against user-defined whitelist (including auto-whitelisted messaging apps)
         Set<String> whitelist = prefs.getStringSet("whitelist", new HashSet<>());
         if (whitelist.contains(pkg)) return;
 
