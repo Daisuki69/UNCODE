@@ -42,7 +42,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               </div>
               <div className="ml-4">
                 <h3 className="text-lg font-bold text-gray-200">Total Device Lockdown</h3>
-                <p className="text-sm text-gray-500">I understand that UNCODE will completely restrict my device access during scheduled hours. I will not be able to use distracting apps.</p>
+                <p className="text-sm text-gray-500">I understand that QIEZKA will completely restrict my device access during scheduled hours. I will not be able to use distracting apps.</p>
               </div>
             </label>
 

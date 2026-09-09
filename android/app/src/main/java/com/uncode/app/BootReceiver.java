@@ -19,7 +19,7 @@ public class BootReceiver extends BroadcastReceiver {
         boolean lockdownWasActive = prefs.getBoolean("lockdown_active", false);
 
         if (lockdownWasActive) {
-            Log.i(TAG, "Boot detected with active lockdown — relaunching UNCODE");
+            Log.i(TAG, "Boot detected with active lockdown — relaunching QIEZKA");
             Intent launch = new Intent(context, MainActivity.class);
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(launch);

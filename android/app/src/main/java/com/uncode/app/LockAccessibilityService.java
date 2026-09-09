@@ -203,8 +203,8 @@ public class LockAccessibilityService extends AccessibilityService {
     }
 
     /**
-     * Sends the user to the Home screen instead of forcing them back into UNCODE.
-     * This is the correct behaviour: UNCODE is not a kiosk, just a selective blocker.
+     * Sends the user to the Home screen instead of forcing them back into QIEZKA.
+     * This is the correct behaviour: QIEZKA is not a kiosk, just a selective blocker.
      */
     private void goHome() {
         try {
@@ -218,7 +218,7 @@ public class LockAccessibilityService extends AccessibilityService {
      * Handles SystemUI events.
      * - Allows the notification shade to be pulled down.
      * - Collapses the Quick Settings (QS) tile panel immediately when expanded.
-     * - Detects when UNCODE is swiped from recents and re-launches it.
+     * - Detects when QIEZKA is swiped from recents and re-launches it.
      */
     private void handleSystemUiEvent(AccessibilityEvent event) {
         CharSequence classNameChar = event.getClassName();
@@ -234,15 +234,15 @@ public class LockAccessibilityService extends AccessibilityService {
             collapseQsPanel();
         }
 
-        // Detect if the user is in the recents overview and UNCODE is not there anymore.
-        // Re-launch UNCODE to make it re-appear and prevent it from being cleared.
+        // Detect if the user is in the recents overview and QIEZKA is not there anymore.
+        // Re-launch QIEZKA to make it re-appear and prevent it from being cleared.
         if (cls.contains("recent") || cls.contains("overview") || cls.contains("taskview")) {
             ensureUncodeInRecents();
         }
     }
 
     /**
-     * If UNCODE was swiped away from recents, re-launch it in the background
+     * If QIEZKA was swiped away from recents, re-launch it in the background
      * so it reappears in the recents stack.
      */
     private void ensureUncodeInRecents() {

@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.uncode.app',
-  appName: 'UNCODE',
+  appName: 'QIEZKA',
   webDir: 'dist',
   android: {
     backgroundColor: '#F9FAFB',

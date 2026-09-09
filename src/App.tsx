@@ -293,11 +293,11 @@ export default function App() {
   const notifyUser = (message: string) => {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
     if (Notification.permission === 'granted') {
-      new Notification('UNCODE ALARM', { body: message });
+      new Notification('QIEZKA ALARM', { body: message });
     } else if (Notification.permission !== 'denied') {
       Notification.requestPermission().then(permission => {
         if (permission === 'granted') {
-          new Notification('UNCODE ALARM', { body: message });
+          new Notification('QIEZKA ALARM', { body: message });
         }
       });
     }
@@ -462,7 +462,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center text-red-500 font-black">
         <Loader2 className="w-12 h-12 animate-spin mb-4" />
-        <span className="uppercase tracking-widest text-xs font-bold text-gray-500">Decrypting UNCODE...</span>
+        <span className="uppercase tracking-widest text-xs font-bold text-gray-500">Decrypting QIEZKA...</span>
       </div>
     );
   }

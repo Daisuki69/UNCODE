@@ -185,7 +185,7 @@ export function PermissionWalkthrough({ onComplete }: PermissionWalkthroughProps
                       Tap <strong className="text-amber-300 font-bold">Allow restricted settings</strong> and verify with your PIN or fingerprint.
                     </li>
                     <li>
-                      Return to UNCODE and complete the steps!
+                      Return to QIEZKA and complete the steps!
                     </li>
                   </ol>
                   <button
@@ -226,7 +226,7 @@ export function PermissionWalkthrough({ onComplete }: PermissionWalkthroughProps
                   <span className="text-xs text-emerald-400 font-bold flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Active</span>
                 )}
               </div>
-              <p className="text-xs text-gray-400 mb-3">Prevents UNCODE from being uninstalled during lockdown (no account removal needed).</p>
+              <p className="text-xs text-gray-400 mb-3">Prevents QIEZKA from being uninstalled during lockdown (no account removal needed).</p>
               
               <div className="flex flex-col gap-2">
                 <button 
@@ -258,7 +258,7 @@ export function PermissionWalkthrough({ onComplete }: PermissionWalkthroughProps
                   <span className="text-xs text-emerald-400 font-bold flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Unrestricted</span>
                 )}
               </div>
-              <p className="text-xs text-gray-400 mb-3">Prevents aggressive OEM battery savers (Samsung/Xiaomi/Pixel) from killing UNCODE.</p>
+              <p className="text-xs text-gray-400 mb-3">Prevents aggressive OEM battery savers (Samsung/Xiaomi/Pixel) from killing QIEZKA.</p>
               <button 
                 onClick={async () => {
                   await requestBatteryOptimization();

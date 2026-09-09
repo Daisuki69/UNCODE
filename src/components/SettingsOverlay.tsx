@@ -62,8 +62,8 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
       };
       
       const jsonString = JSON.stringify(allData, null, 2);
-      const tempFileName = `temp_uncode_backup_${Date.now()}.json`;
-      const defaultName = `uncode_backup_${new Date().toISOString().slice(0,10)}.json`;
+      const tempFileName = `temp_qiezka_backup_${Date.now()}.json`;
+      const defaultName = `qiezka_backup_${new Date().toISOString().slice(0,10)}.json`;
 
       // Write to internal cache
       await Filesystem.writeFile({

@@ -470,7 +470,7 @@ export function Dashboard({
           >
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 mt-2">
 
-          <h1 className="text-2xl font-black tracking-tighter text-gray-900">UNCODE</h1>
+          <h1 className="text-2xl font-black tracking-tighter text-gray-900">QIEZKA</h1>
           
           <div className="flex items-center space-x-4">
             <div className="flex items-center bg-gray-100 rounded-lg px-3 py-1 border border-gray-200" title="Click to simulate a different time">

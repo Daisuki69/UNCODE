@@ -58,7 +58,7 @@ public class LockPlugin extends Plugin {
             JSArray allowedAppIds = call.getArray("allowedAppIds");
 
             Set<String> whitelist = new HashSet<>();
-            whitelist.add(getActivity().getPackageName()); // Always allow UNCODE itself
+            whitelist.add(getActivity().getPackageName()); // Always allow QIEZKA itself
             if (allowedAppIds != null) {
                 for (int i = 0; i < allowedAppIds.length(); i++) {
                     whitelist.add(allowedAppIds.getString(i));
@@ -71,7 +71,7 @@ public class LockPlugin extends Plugin {
                     .putBoolean("lockdown_active", true)
                     .apply();
 
-            // If Device Owner: protect UNCODE from force-stop and uninstall
+            // If Device Owner: protect QIEZKA from force-stop and uninstall
             if (dpm.isDeviceOwnerApp(getActivity().getPackageName())) {
                 // Block uninstall while lockdown is active
                 dpm.setUninstallBlocked(adminComponent, getActivity().getPackageName(), true);
@@ -288,7 +288,7 @@ public class LockPlugin extends Plugin {
             Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
             intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent);
             intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                "Activate UNCODE as Device Administrator to prevent uninstallation during lockdown.");
+                "Activate QIEZKA as Device Administrator to prevent uninstallation during lockdown.");
             startActivityForResult(call, intent, "deviceAdminResult");
         } catch (Exception e) {
             Log.e(TAG, "Direct ADD_DEVICE_ADMIN failed, opening settings list", e);

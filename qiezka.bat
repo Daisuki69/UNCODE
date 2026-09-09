@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-title UNCODE Setup and Permissions Tool
+title QIEZKA Setup and Permissions Tool
 
 :: ============================================================================
 ::                     USER CONFIGURATION / PREFERENCES
@@ -16,10 +16,10 @@ set "BYPASS_RESTRICTED_SETTINGS=true"
 :: 3. Grant elevated system permissions (WRITE_SECURE_SETTINGS, DUMP)
 set "GRANT_SECURE_PERMISSIONS=true"
 
-:: 4. Whitelist UNCODE from aggressive OS battery savers (Samsung, Xiaomi, etc.)
+:: 4. Whitelist QIEZKA from aggressive OS battery savers (Samsung, Xiaomi, etc.)
 set "WHITELIST_BATTERY=true"
 
-:: 5. Automatically enable UNCODE's Accessibility Service via ADB
+:: 5. Automatically enable QIEZKA's Accessibility Service via ADB
 set "ENABLE_ACCESSIBILITY=true"
 
 :: 6. Activate Device Administrator to prevent uninstallation during lockdown
@@ -30,7 +30,7 @@ set "ACTIVATE_DEVICE_ADMIN=true"
 ::    (Unrealistic for everyday devices: requires root or removing all Google accounts)
 set "TRY_DEVICE_OWNER=false"
 
-:: 8. Automatically launch UNCODE on your phone after setup completes
+:: 8. Automatically launch QIEZKA on your phone after setup completes
 set "LAUNCH_APP_ON_FINISH=true"
 
 :: ============================================================================
@@ -48,7 +48,7 @@ set "PROJECT_DIR=%~dp0"
 
 echo.
 echo  ====================================================
-echo   UNCODE - Android Permission and Lockdown Setup
+echo   QIEZKA - Android Permission and Lockdown Setup
 echo  ====================================================
 echo.
 
@@ -70,27 +70,29 @@ echo       Device found: !DEVICE!
 echo.
 
 :: [2/6] Check App Installation / APK Install
-echo [2/6] Checking UNCODE installation on device...
+echo [2/6] Checking QIEZKA installation on device...
 set "APP_INSTALLED="
 for /f "tokens=*" %%p in ('adb.exe shell pm path com.uncode.app 2^>nul') do set "APP_INSTALLED=%%p"
 
 if not "!APP_INSTALLED!"=="" (
     if /i "!FORCE_REINSTALL_APK!"=="true" (
-        echo       UNCODE is already on device, but FORCE_REINSTALL_APK is true.
+        echo       QIEZKA is already on device, but FORCE_REINSTALL_APK is true.
         goto :do_install
     )
-    echo       UNCODE is already installed on your device.
+    echo       QIEZKA is already installed on your device.
     echo       Proceeding directly to permissions setup...
     goto :after_install
 )
 
 :do_install
-echo       UNCODE is not installed on your phone yet.
+echo       QIEZKA is not installed on your phone yet.
 echo       Searching for local APK to install...
 
 set "APK_PATH="
 if exist "%PROJECT_DIR%android\app\build\outputs\apk\debug\app-debug.apk" (
     set "APK_PATH=%PROJECT_DIR%android\app\build\outputs\apk\debug\app-debug.apk"
+) else if exist "%PROJECT_DIR%qiezka.apk" (
+    set "APK_PATH=%PROJECT_DIR%qiezka.apk"
 ) else if exist "%PROJECT_DIR%app-debug.apk" (
     set "APK_PATH=%PROJECT_DIR%app-debug.apk"
 ) else if exist "%PROJECT_DIR%uncode.apk" (
@@ -105,15 +107,15 @@ if not "!APK_PATH!"=="" (
         echo       [ERROR] APK installation failed. Ensure your phone screen is unlocked.
         goto :end
     ) else (
-        echo       UNCODE installed successfully.
+        echo       QIEZKA installed successfully.
     )
 ) else (
     echo.
     echo  ========================================================================
-    echo   [ERROR] UNCODE is NOT installed on your phone and no APK was found!
+    echo   [ERROR] QIEZKA is NOT installed on your phone and no APK was found!
     echo  ========================================================================
     echo.
-    echo   Please download and install UNCODE on your phone first from GitHub:
+    echo   Please download and install QIEZKA on your phone first from GitHub:
     echo   https://github.com/Daisuki69/uncode/releases
     echo.
     echo   Once installed on your phone, re-run this script to configure permissions.
@@ -192,9 +194,9 @@ if /i "!TRY_DEVICE_OWNER!"=="true" (
 )
 echo.
 
-:: Launch UNCODE
+:: Launch QIEZKA
 if /i "!LAUNCH_APP_ON_FINISH!"=="true" (
-    echo Launching UNCODE...
+    echo Launching QIEZKA...
     adb.exe shell am start -n com.uncode.app/.MainActivity >nul 2>&1
     echo.
 )

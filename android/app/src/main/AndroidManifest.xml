@@ -14,7 +14,7 @@
     <!-- Status bar control (QS collapse via EXPAND_STATUS_BAR) -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
-    <!-- Battery optimization exemption (prevent Android from killing UNCODE) -->
+    <!-- Battery optimization exemption (prevent Android from killing QIEZKA) -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Device Admin (set via ADB - does NOT require user interaction at install) -->
@@ -23,7 +23,7 @@
     <!-- Allows querying installed apps to create the whitelist (Android 11+) -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
-    <!-- Boot: relaunch UNCODE if lockdown was active before restart -->
+    <!-- Boot: relaunch QIEZKA if lockdown was active before restart -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Notifications: lock status, timers, and alerts (Android 13+) -->
@@ -93,7 +93,7 @@
         </service>
 
         <!-- ===== Boot Receiver ===== -->
-        <!-- Re-launches UNCODE on device boot if a lockdown was active -->
+        <!-- Re-launches QIEZKA on device boot if a lockdown was active -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
