@@ -21,7 +21,9 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -146,161 +148,385 @@ public class LockPlugin extends Plugin {
 
     @PluginMethod
     public void getInstalledApps(PluginCall call) {
-        try {
-            PackageManager pm = getActivity().getPackageManager();
-            List<ApplicationInfo> installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
+        Runnable task = () -> {
+            try {
+                PackageManager pm = getActivity().getPackageManager();
+                String myPkg = getActivity().getPackageName();
 
-            JSArray apps = new JSArray();
-            Set<String> addedPackages = new HashSet<>();
-            for (ApplicationInfo info : installedApps) {
-                if (info.packageName == null || info.packageName.equals(getActivity().getPackageName())) {
-                    continue;
-                }
-                if (BlacklistConstants.isBlacklisted(info.packageName)) {
-                    continue; // Strictly omit blacklisted distracting apps from selection
-                }
-                if (isKeyboardApp(info.packageName)) {
-                    continue; // Keyboards are silent infrastructure exemptions, never show in allowed apps section or modal
-                }
-
-                boolean isSystemApp = (info.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
-                boolean isLaunchable = pm.getLaunchIntentForPackage(info.packageName) != null;
-                boolean isBrowser = isBrowserApp(info.packageName);
-                boolean isMusic = isMusicApp(info.packageName);
-                boolean isCamera = isCameraApp(info.packageName);
-                boolean isHardcoded = isBrowser || isMusic || isCamera;
-
-                // Include user-installed apps, and any system app that is either launchable (like Chrome, Camera, Samsung Internet) or hardcoded exempt
-                if (!isSystemApp || isLaunchable || isHardcoded) {
-                    if (addedPackages.contains(info.packageName)) continue;
-                    addedPackages.add(info.packageName);
-
-                    JSObject app = new JSObject();
-                    app.put("id", info.packageName);
-                    app.put("name", pm.getApplicationLabel(info).toString());
-                    app.put("iconName", isBrowser ? "Globe" : (isMusic ? "Music" : (isCamera ? "Camera" : "LayoutGrid")));
-                    app.put("isHardcoded", isHardcoded);
-                    app.put("isBrowser", isBrowser);
-                    app.put("isMusic", isMusic);
-                    app.put("isCamera", isCamera);
-                    
-                    try {
-                        Drawable icon = pm.getApplicationIcon(info);
-                        String base64Icon = getBase64Icon(icon);
-                        if (base64Icon != null) {
-                            app.put("iconBase64", base64Icon);
+                // 1. Single-pass pre-queries (run once, not inside any package loop)
+                Set<String> browserPackages = new HashSet<>();
+                try {
+                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"));
+                    browserIntent.addCategory(Intent.CATEGORY_BROWSABLE);
+                    List<ResolveInfo> bList = pm.queryIntentActivities(browserIntent, 0);
+                    for (ResolveInfo r : bList) {
+                        if (r.activityInfo != null && r.activityInfo.packageName != null) {
+                            browserPackages.add(r.activityInfo.packageName);
                         }
-                    } catch (Exception ignore) {}
+                    }
+                } catch (Exception ignore) {}
 
-                    apps.put(app);
+                Set<String> musicPackages = new HashSet<>();
+                try {
+                    Intent musicIntent = new Intent(Intent.ACTION_MAIN);
+                    musicIntent.addCategory(Intent.CATEGORY_APP_MUSIC);
+                    List<ResolveInfo> mList = pm.queryIntentActivities(musicIntent, 0);
+                    for (ResolveInfo r : mList) {
+                        if (r.activityInfo != null && r.activityInfo.packageName != null) {
+                            musicPackages.add(r.activityInfo.packageName);
+                        }
+                    }
+                    Intent audioIntent = new Intent(Intent.ACTION_VIEW);
+                    audioIntent.setDataAndType(Uri.parse("file://test.mp3"), "audio/*");
+                    List<ResolveInfo> aList = pm.queryIntentActivities(audioIntent, 0);
+                    for (ResolveInfo r : aList) {
+                        if (r.activityInfo != null && r.activityInfo.packageName != null) {
+                            musicPackages.add(r.activityInfo.packageName);
+                        }
+                    }
+                } catch (Exception ignore) {}
+
+                Set<String> cameraPackages = new HashSet<>();
+                try {
+                    Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                    List<ResolveInfo> cList = pm.queryIntentActivities(cameraIntent, 0);
+                    for (ResolveInfo r : cList) {
+                        if (r.activityInfo != null && r.activityInfo.packageName != null) {
+                            cameraPackages.add(r.activityInfo.packageName);
+                        }
+                    }
+                } catch (Exception ignore) {}
+
+                Set<String> keyboardPackages = new HashSet<>();
+                try {
+                    String defaultIme = Settings.Secure.getString(getActivity().getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+                    if (defaultIme != null && defaultIme.contains("/")) {
+                        keyboardPackages.add(defaultIme.split("/")[0]);
+                    }
+                    InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+                    if (imm != null) {
+                        List<InputMethodInfo> imis = imm.getInputMethodList();
+                        if (imis != null) {
+                            for (InputMethodInfo imi : imis) {
+                                if (imi != null && imi.getPackageName() != null) {
+                                    keyboardPackages.add(imi.getPackageName());
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception ignore) {}
+
+                Set<String> authenticatorPackages = new HashSet<>(Arrays.asList(
+                    "com.google.android.apps.authenticator2",
+                    "com.azure.authenticator",
+                    "com.duosecurity.duomobile",
+                    "com.authy.authy",
+                    "com.twofasapp",
+                    "com.beemdevelopment.aegis",
+                    "com.bitwarden.authenticator",
+                    "com.lastpass.authenticator",
+                    "org.fedorahosted.freeotp",
+                    "com.yubico.yubioath"
+                ));
+
+                Set<String> notesPackages = new HashSet<>(Arrays.asList(
+                    "com.google.android.keep",
+                    "com.samsung.android.app.notes",
+                    "com.microsoft.office.onenote",
+                    "notion.id",
+                    "md.obsidian",
+                    "com.evernote",
+                    "com.socialnmobile.dictapps.notepad.color.note",
+                    "com.zoho.notebook",
+                    "com.automattic.simplenote",
+                    "com.steadfastinnovation.android.furret",
+                    "com.nebula.notes",
+                    "com.colornote.notepad",
+                    "com.acadoid.lecturenotes"
+                ));
+
+                Set<String> studentPackages = new HashSet<>(Arrays.asList(
+                    "com.google.android.apps.classroom",
+                    "com.google.android.apps.docs",
+                    "com.google.android.apps.docs.editors.docs",
+                    "com.google.android.apps.docs.editors.sheets",
+                    "com.google.android.apps.docs.editors.slides",
+                    "com.instructure.candroid",
+                    "com.blackboard.android.bbmatx",
+                    "com.schoology.app",
+                    "com.quizlet.quizletandroid",
+                    "com.ichi2.anki",
+                    "com.microblink.photomath",
+                    "com.desmos.calculator",
+                    "org.geogebra.android",
+                    "com.wolfram.android.alpha",
+                    "com.microsoft.office.officehubrow",
+                    "com.microsoft.office.word",
+                    "com.microsoft.office.excel",
+                    "com.microsoft.office.powerpoint"
+                ));
+
+                Set<String> aiPackages = new HashSet<>(Arrays.asList(
+                    "com.google.android.apps.bard",
+                    "com.openai.chatgpt",
+                    "com.anthropic.claude",
+                    "com.microsoft.copilot",
+                    "ai.perplexity.app.android",
+                    "com.deepseek.chat",
+                    "com.quora.poe.android",
+                    "ai.inflection.pi"
+                ));
+
+                // 2. Query user-launchable apps directly to avoid iterating hundreds of hidden system daemons
+                Intent launcherIntent = new Intent(Intent.ACTION_MAIN);
+                launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+                List<ResolveInfo> launcherList = pm.queryIntentActivities(launcherIntent, 0);
+
+                Set<String> candidatePackages = new LinkedHashSet<>();
+                for (ResolveInfo r : launcherList) {
+                    if (r.activityInfo != null && r.activityInfo.packageName != null) {
+                        candidatePackages.add(r.activityInfo.packageName);
+                    }
                 }
-            }
+                candidatePackages.addAll(browserPackages);
+                candidatePackages.addAll(musicPackages);
+                candidatePackages.addAll(cameraPackages);
+                candidatePackages.addAll(authenticatorPackages);
+                candidatePackages.addAll(notesPackages);
+                candidatePackages.addAll(studentPackages);
+                candidatePackages.addAll(aiPackages);
 
-            JSObject result = new JSObject();
-            result.put("apps", apps);
-            call.resolve(result);
-        } catch (Exception e) {
-            Log.e(TAG, "getInstalledApps failed", e);
-            call.reject("getInstalledApps failed: " + e.getMessage());
+                JSArray apps = new JSArray();
+                Set<String> addedPackages = new HashSet<>();
+
+                for (String pkg : candidatePackages) {
+                    if (pkg == null || pkg.equals(myPkg) || addedPackages.contains(pkg)) {
+                        continue;
+                    }
+                    if (BlacklistConstants.isBlacklisted(pkg)) {
+                        continue; // Strictly omit blacklisted distracting apps from selection
+                    }
+                    if (keyboardPackages.contains(pkg) || isKeyboardAppKeywords(pkg)) {
+                        continue; // Keyboards are silently exempted in lockdown, hidden from whitelist UI
+                    }
+
+                    try {
+                        ApplicationInfo appInfo = pm.getApplicationInfo(pkg, 0);
+                        String appLabel = pm.getApplicationLabel(appInfo).toString();
+
+                        if (isHiddenInfrastructureApp(pkg, appLabel)) {
+                            continue; // Hide camera extension proxies, aperture lens launchers, etc.
+                        }
+
+                        boolean isBrowser = browserPackages.contains(pkg) || isBrowserAppKeywords(pkg);
+                        boolean isMusic = musicPackages.contains(pkg) || isMusicAppKeywords(pkg);
+                        boolean isCamera = cameraPackages.contains(pkg) || isCameraAppKeywords(pkg);
+                        boolean isAuthenticator = authenticatorPackages.contains(pkg) || isAuthenticatorAppKeywords(pkg, appLabel);
+                        boolean isNotes = notesPackages.contains(pkg) || isNotesAppKeywords(pkg, appLabel);
+                        boolean isStudentApp = studentPackages.contains(pkg) || isStudentAppKeywords(pkg, appLabel);
+                        boolean isAi = aiPackages.contains(pkg) || isAiAppKeywords(pkg, appLabel);
+                        boolean isHardcoded = isBrowser || isMusic || isCamera || isAuthenticator || isNotes || isStudentApp || isAi;
+
+                        addedPackages.add(pkg);
+
+                        JSObject app = new JSObject();
+                        app.put("id", pkg);
+                        app.put("name", appLabel);
+
+                        String iconName = "LayoutGrid";
+                        if (isBrowser) iconName = "Globe";
+                        else if (isMusic) iconName = "Music";
+                        else if (isCamera) iconName = "Camera";
+                        else if (isAuthenticator) iconName = "ShieldCheck";
+                        else if (isAi) iconName = "Sparkles";
+                        else if (isNotes) iconName = "FileText";
+                        else if (isStudentApp) iconName = "BookOpen";
+
+                        app.put("iconName", iconName);
+                        app.put("isHardcoded", isHardcoded);
+                        app.put("isBrowser", isBrowser);
+                        app.put("isMusic", isMusic);
+                        app.put("isCamera", isCamera);
+                        app.put("isAuthenticator", isAuthenticator);
+                        app.put("isNotes", isNotes);
+                        app.put("isStudentApp", isStudentApp);
+                        app.put("isAi", isAi);
+
+                        try {
+                            Drawable icon = pm.getApplicationIcon(appInfo);
+                            String base64Icon = getBase64Icon(icon);
+                            if (base64Icon != null) {
+                                app.put("iconBase64", base64Icon);
+                            }
+                        } catch (Exception ignore) {}
+
+                        apps.put(app);
+                    } catch (PackageManager.NameNotFoundException ignore) {}
+                }
+
+                JSObject result = new JSObject();
+                result.put("apps", apps);
+                call.resolve(result);
+            } catch (Exception e) {
+                Log.e(TAG, "getInstalledApps failed", e);
+                call.reject("getInstalledApps failed: " + e.getMessage());
+            }
+        };
+
+        if (getBridge() != null) {
+            getBridge().execute(task);
+        } else {
+            new Thread(task).start();
         }
     }
 
-    private boolean isBrowserApp(String packageName) {
-        if (packageName == null) return false;
-        String lower = packageName.toLowerCase();
-        if (lower.contains("chrome") || lower.contains("browser") || lower.contains("firefox") || lower.contains("opera") || lower.contains("brave") || lower.contains("duckduckgo")) return true;
-        try {
-            PackageManager pm = getActivity().getPackageManager();
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"));
-            intent.addCategory(Intent.CATEGORY_BROWSABLE);
-            List<ResolveInfo> list = pm.queryIntentActivities(intent, 0);
-            for (ResolveInfo r : list) {
-                if (r.activityInfo != null && packageName.equals(r.activityInfo.packageName)) return true;
+    private boolean isAuthenticatorAppKeywords(String packageName, String label) {
+        if (packageName != null) {
+            String lower = packageName.toLowerCase();
+            if (lower.contains("authenticator") || lower.contains("twofas") || lower.contains("duomobile") || lower.contains("yubioath")) {
+                return true;
             }
-        } catch (Exception ignore) {}
+        }
+        if (label != null) {
+            String lowerLabel = label.toLowerCase();
+            if (lowerLabel.contains("authenticator") || lowerLabel.contains("2fa") || lowerLabel.contains("otp")) {
+                return true;
+            }
+        }
         return false;
     }
 
-    private boolean isMusicApp(String packageName) {
-        if (packageName == null) return false;
-        String lower = packageName.toLowerCase();
-        if (lower.contains("music") || lower.contains("spotify") || lower.contains("tidal") || lower.contains("deezer") || lower.contains("soundcloud") || lower.contains("aspiro")) return true;
-        try {
-            PackageManager pm = getActivity().getPackageManager();
-            Intent intent = new Intent(Intent.ACTION_MAIN);
-            intent.addCategory(Intent.CATEGORY_APP_MUSIC);
-            List<ResolveInfo> list = pm.queryIntentActivities(intent, 0);
-            for (ResolveInfo r : list) {
-                if (r.activityInfo != null && packageName.equals(r.activityInfo.packageName)) return true;
+    private boolean isNotesAppKeywords(String packageName, String label) {
+        if (packageName != null) {
+            String lower = packageName.toLowerCase();
+            if (lower.contains("keep") || lower.contains("onenote") || lower.contains("obsidian") ||
+                lower.contains("notion") || lower.contains("notepad") || lower.contains(".notes") ||
+                lower.contains("memo") || lower.contains("simplenote") || lower.contains("colornote")) {
+                return true;
             }
-        } catch (Exception ignore) {}
+        }
+        if (label != null) {
+            String lowerLabel = label.toLowerCase();
+            if (lowerLabel.contains("notes") || lowerLabel.contains("notepad") || lowerLabel.contains("memo") ||
+                lowerLabel.contains("keep") || lowerLabel.contains("onenote") || lowerLabel.contains("notion") ||
+                lowerLabel.contains("obsidian") || lowerLabel.contains("journal")) {
+                return true;
+            }
+        }
         return false;
     }
 
-    private boolean isCameraApp(String packageName) {
-        if (packageName == null) return false;
-        String lower = packageName.toLowerCase();
-        if (lower.contains("camera")) return true;
-        try {
-            PackageManager pm = getActivity().getPackageManager();
-            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            List<ResolveInfo> list = pm.queryIntentActivities(intent, 0);
-            for (ResolveInfo r : list) {
-                if (r.activityInfo != null && packageName.equals(r.activityInfo.packageName)) return true;
+    private boolean isStudentAppKeywords(String packageName, String label) {
+        if (packageName != null) {
+            String lower = packageName.toLowerCase();
+            if (lower.contains("classroom") || lower.contains("canvas") || lower.contains("blackboard") ||
+                lower.contains("schoology") || lower.contains("quizlet") || lower.contains("anki") ||
+                lower.contains("desmos") || lower.contains("geogebra") || lower.contains("calculator") ||
+                lower.contains("docs.editors") || (lower.contains("google") && lower.contains("docs")) ||
+                lower.contains("photomath") || lower.contains("wolfram")) {
+                return true;
             }
-        } catch (Exception ignore) {}
+        }
+        if (label != null) {
+            String lowerLabel = label.toLowerCase();
+            if (lowerLabel.contains("classroom") || lowerLabel.contains("canvas") || lowerLabel.contains("blackboard") ||
+                lowerLabel.contains("schoology") || lowerLabel.contains("quizlet") || lowerLabel.contains("anki") ||
+                lowerLabel.contains("desmos") || lowerLabel.contains("geogebra") || lowerLabel.contains("calculator") ||
+                lowerLabel.contains("photomath") || lowerLabel.contains("docs") || lowerLabel.contains("sheets") ||
+                lowerLabel.contains("slides") || lowerLabel.contains("drive") || lowerLabel.contains("student")) {
+                return true;
+            }
+        }
         return false;
     }
 
-    private boolean isKeyboardApp(String packageName) {
+    private boolean isAiAppKeywords(String packageName, String label) {
+        if (packageName != null) {
+            String lower = packageName.toLowerCase();
+            if (lower.contains("chatgpt") || lower.contains("bard") || lower.contains("gemini") ||
+                lower.contains("claude") || lower.contains("copilot") || lower.contains("perplexity") ||
+                lower.contains("deepseek") || lower.contains(".poe")) {
+                return true;
+            }
+        }
+        if (label != null) {
+            String lowerLabel = label.toLowerCase();
+            if (lowerLabel.contains("chatgpt") || lowerLabel.contains("gemini") || lowerLabel.contains("claude") ||
+                lowerLabel.contains("copilot") || lowerLabel.contains("perplexity") || lowerLabel.contains("deepseek") ||
+                lowerLabel.contains("ai assistant") || lowerLabel.contains("poe")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isBrowserAppKeywords(String packageName) {
         if (packageName == null) return false;
         String lower = packageName.toLowerCase();
-        if (lower.contains("inputmethod") || 
+        return lower.contains("chrome") || lower.contains("browser") || lower.contains("firefox") || lower.contains("opera") || lower.contains("brave") || lower.contains("duckduckgo");
+    }
+
+    private boolean isMusicAppKeywords(String packageName) {
+        if (packageName == null) return false;
+        String lower = packageName.toLowerCase();
+        return lower.contains("music") || lower.contains("spotify") || lower.contains("tidal") || lower.contains("deezer") || lower.contains("soundcloud") || lower.contains("aspiro");
+    }
+
+    private boolean isCameraAppKeywords(String packageName) {
+        if (packageName == null) return false;
+        String lower = packageName.toLowerCase();
+        return lower.contains("camera");
+    }
+
+    private boolean isKeyboardAppKeywords(String packageName) {
+        if (packageName == null) return false;
+        String lower = packageName.toLowerCase();
+        return lower.contains("inputmethod") || 
             lower.contains("honeyboard") || 
             lower.contains("keyboard") || 
             lower.contains("gboard") || 
             lower.contains("swiftkey") || 
-            lower.contains(".ime")) {
-            return true;
-        }
-        try {
-            String defaultIme = Settings.Secure.getString(getActivity().getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
-            if (defaultIme != null && defaultIme.startsWith(packageName + "/")) {
+            lower.contains(".ime");
+    }
+
+    private boolean isHiddenInfrastructureApp(String packageName, String label) {
+        if (packageName != null) {
+            String lower = packageName.toLowerCase();
+            if (lower.contains("cameraextension") ||
+                lower.contains("extensionproxy") ||
+                lower.contains("lenslauncher") ||
+                lower.contains("aperturelenslauncher") ||
+                lower.contains("opensourcemusicplayer") ||
+                lower.contains("androidopensourcemusicplayer")) {
                 return true;
             }
-        } catch (Exception ignore) {}
-        try {
-            InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm != null) {
-                List<InputMethodInfo> imis = imm.getInputMethodList();
-                if (imis != null) {
-                    for (InputMethodInfo imi : imis) {
-                        if (imi != null && packageName.equals(imi.getPackageName())) {
-                            return true;
-                        }
-                    }
-                }
+        }
+        if (label != null) {
+            String lowerLabel = label.toLowerCase().replace(" ", "");
+            if (lowerLabel.contains("cameraextensionproxy") ||
+                lowerLabel.contains("cameraextension") ||
+                lowerLabel.contains("lenslauncher") ||
+                lowerLabel.contains("aperturelenslauncher") ||
+                lowerLabel.contains("aperaturelenslauncher") ||
+                lowerLabel.contains("androidopensourcemusicplayer") ||
+                lowerLabel.contains("opensourcemusicplayer")) {
+                return true;
             }
-        } catch (Exception ignore) {}
+        }
         return false;
     }
 
     private String getBase64Icon(Drawable icon) {
+        if (icon == null) return null;
         try {
-            int width = Math.max(icon.getIntrinsicWidth(), 1);
-            int height = Math.max(icon.getIntrinsicHeight(), 1);
-            // Limit size to prevent memory issues with high-res icons
-            if (width > 256 || height > 256) {
-                width = 128;
-                height = 128;
-            }
-            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            int targetDim = 96;
+            Bitmap bitmap = Bitmap.createBitmap(targetDim, targetDim, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
-            icon.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+            icon.setBounds(0, 0, targetDim, targetDim);
             icon.draw(canvas);
 
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            bitmap.compress(Bitmap.CompressFormat.PNG, 80, outputStream);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 75, outputStream);
             return Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP);
         } catch (Exception e) {
             return null;

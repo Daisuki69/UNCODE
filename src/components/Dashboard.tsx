@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, BookOpen, Trash2, Plus, Sparkles, Pencil, Upload, Loader2, Settings, ShieldAlert, X, GitMerge, FileText, Calculator, Music, Globe, MessageSquare, MonitorPlay, Check, LayoutGrid } from 'lucide-react';
+import { Clock, BookOpen, Trash2, Plus, Sparkles, Pencil, Upload, Loader2, Settings, ShieldAlert, X, GitMerge, FileText, Calculator, Music, Globe, MessageSquare, MonitorPlay, Check, LayoutGrid, Camera, ShieldCheck } from 'lucide-react';
 import { AppSettings, SavedResource, ScheduleData, AllowedApp } from '../types';
 import { getInstalledApps } from '../systemBridge';
-import { parseResource } from '../api/parseResource';
-import { declutterResource } from '../api/declutterResource';
+import { isAppBlacklisted } from '../constants/blacklistedApps';
+import { HARDCODED_SYSTEM_ALLOWED, DEFAULT_HARDCODED_APPS, isHardcodedApp, isBrowserPackage, isMusicPackage, isCameraPackage, isAuthenticatorPackage, isMessagingPackage, isKeyboardPackage, isHiddenSystemExemptApp, isNotesPackage, isStudentPackage, isAiPackage } from '../constants/allowedApps';
 
 interface DashboardProps {
   settings: AppSettings;
@@ -27,6 +27,7 @@ interface DashboardProps {
   onTimeOverride: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onResetTime: () => void;
   onSettingsChange?: (updates: Partial<AppSettings>) => void;
+  installedApps?: AllowedApp[];
 }
 
 const pageVariants = {
@@ -41,14 +42,15 @@ const pageVariants = {
   })
 };
 
-const SIMULATED_APPS = [
+const SIMULATED_APPS: AllowedApp[] = [
+  { id: 'com.google.chrome', name: 'Chrome', iconName: 'Globe', isHardcoded: true, isBrowser: true },
+  { id: 'com.spotify.music', name: 'Spotify', iconName: 'Music', isHardcoded: true, isMusic: true },
+  { id: 'com.google.android.apps.youtube.music', name: 'YT Music', iconName: 'Music', isHardcoded: true, isMusic: true },
+  { id: 'com.sec.android.app.camera', name: 'Camera', iconName: 'Camera', isHardcoded: true, isCamera: true },
   { id: 'com.apple.calculator', name: 'Calculator', iconName: 'Calculator' },
   { id: 'com.microsoft.word', name: 'Word', iconName: 'FileText' },
-  { id: 'com.spotify.music', name: 'Spotify', iconName: 'Music' },
-  { id: 'com.google.chrome', name: 'Chrome', iconName: 'Globe' },
   { id: 'notion.id', name: 'Notion', iconName: 'BookOpen' },
   { id: 'com.apple.MobileSMS', name: 'Messages', iconName: 'MessageSquare' },
-  { id: 'com.youtube.app', name: 'YouTube', iconName: 'MonitorPlay' },
 ];
 
 export function Dashboard({ 
@@ -71,7 +73,8 @@ export function Dashboard({
   timeOffset,
   onTimeOverride,
   onResetTime,
-  onSettingsChange
+  onSettingsChange,
+  installedApps = []
 }: DashboardProps) {
   const [isAppSelectorOpen, setIsAppSelectorOpen] = useState(false);
   const [availableApps, setAvailableApps] = useState<AllowedApp[]>([]);
@@ -82,14 +85,14 @@ export function Dashboard({
       setIsLoadingApps(true);
       getInstalledApps().then(nativeApps => {
         if (nativeApps && nativeApps.length > 0) {
-          setAvailableApps(nativeApps);
+          setAvailableApps(nativeApps.filter(app => !isAppBlacklisted(app.id)));
         } else {
           // Dev/web fallback only — on real Android this should always return apps
-          setAvailableApps(SIMULATED_APPS);
+          setAvailableApps(SIMULATED_APPS.filter(app => !isAppBlacklisted(app.id)));
         }
         setIsLoadingApps(false);
       }).catch(() => {
-        setAvailableApps(SIMULATED_APPS);
+        setAvailableApps(SIMULATED_APPS.filter(app => !isAppBlacklisted(app.id)));
         setIsLoadingApps(false);
       });
     }
@@ -145,6 +148,7 @@ export function Dashboard({
 
     try {
       if (settings.apiKey) {
+        const { declutterResource } = await import('../api/declutterResource');
         const data = await declutterResource({
           title: newResTitle,
           content: newResContent,
@@ -190,6 +194,7 @@ export function Dashboard({
 
     setIsParsing(true);
     try {
+      const { parseResource } = await import('../api/parseResource');
       const data = await parseResource({
         file,
         type: 'transcription',
@@ -730,56 +735,113 @@ export function Dashboard({
         </div>
         <p className="text-sm text-gray-500 mb-6">These applications will remain accessible when the system is locked.</p>
 
-        {(!settings.allowedApps || settings.allowedApps.length === 0) ? (
-          <div className="flex flex-col items-center justify-center text-gray-400 p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-            <LayoutGrid className="w-12 h-12 mb-4 opacity-20" />
-            <p className="font-bold text-gray-500 mb-1">No apps allowed</p>
-            <p className="text-sm">Everything will be blocked during lock unless you add apps here.</p>
-          </div>
-        ) : (
-          <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
-            {settings.allowedApps.map((app) => {
-              const IconComp = [Calculator, FileText, Music, Globe, BookOpen, MessageSquare, MonitorPlay].find(c => c.name === app.iconName || c.displayName === app.iconName || c.render?.name === app.iconName) || LayoutGrid;
-              // Simple mapping to get the correct icon component
-              const iconMap: Record<string, React.ElementType> = {
-                'Calculator': Calculator,
-                'FileText': FileText,
-                'Music': Music,
-                'Globe': Globe,
-                'BookOpen': BookOpen,
-                'MessageSquare': MessageSquare,
-                'MonitorPlay': MonitorPlay
-              };
-              const RenderIcon = iconMap[app.iconName] || LayoutGrid;
+        {(() => {
+          const pool = (installedApps && installedApps.length > 0) ? installedApps : availableApps;
+          const detectedHardcoded = (pool || []).filter(app => !isAppBlacklisted(app.id) && isHardcodedApp(app) && !isHiddenSystemExemptApp(app.id, app.name));
+          const hardcodedApps: AllowedApp[] = detectedHardcoded.length > 0 ? detectedHardcoded : DEFAULT_HARDCODED_APPS;
 
-              return (
-                <div key={app.id} className="flex flex-col items-center flex-shrink-0 group relative">
-                  <button
-                    onClick={() => {
-                      if (onSettingsChange) {
-                        onSettingsChange({
-                          allowedApps: settings.allowedApps!.filter(a => a.id !== app.id)
-                        });
-                      }
-                    }}
-                    className="absolute -top-2 -right-2 bg-gray-900 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-500"
-                    title="Remove App"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                  <div className="w-16 h-16 bg-white border border-gray-200 rounded-2xl flex items-center justify-center mb-2 group-hover:bg-gray-50 transition-colors shadow-sm overflow-hidden relative">
+          const customApps = (settings.allowedApps || []).filter(app => 
+            !isAppBlacklisted(app.id) && 
+            !isHardcodedApp(app) &&
+            !isHiddenSystemExemptApp(app.id, app.name) &&
+            !hardcodedApps.some(h => h.id === app.id)
+          );
+
+          const unifiedAllowedApps: Array<AllowedApp & { isHardcoded: boolean }> = [
+            ...hardcodedApps.map(h => ({ ...h, isHardcoded: true })),
+            ...customApps.map(c => ({ ...c, isHardcoded: false }))
+          ];
+
+          const iconMap: Record<string, React.ElementType> = {
+            'Calculator': Calculator,
+            'FileText': FileText,
+            'Music': Music,
+            'Globe': Globe,
+            'BookOpen': BookOpen,
+            'MessageSquare': MessageSquare,
+            'MonitorPlay': MonitorPlay,
+            'Camera': Camera,
+            'ShieldCheck': ShieldCheck,
+            'Sparkles': Sparkles
+          };
+
+          const renderAppItem = (app: AllowedApp, isHardcoded: boolean) => {
+            let FallbackIcon = iconMap[app.iconName] || LayoutGrid;
+            if (isBrowserPackage(app.id)) FallbackIcon = Globe;
+            else if (isMusicPackage(app.id, app.name)) FallbackIcon = Music;
+            else if (isCameraPackage(app.id, app.name)) FallbackIcon = Camera;
+            else if (isAuthenticatorPackage(app.id, app.name)) FallbackIcon = ShieldCheck;
+            else if (isAiPackage(app.id, app.name)) FallbackIcon = Sparkles;
+            else if (isNotesPackage(app.id, app.name)) FallbackIcon = FileText;
+            else if (isStudentPackage(app.id, app.name)) FallbackIcon = BookOpen;
+            else if (isMessagingPackage(app.id)) FallbackIcon = MessageSquare;
+
+            return (
+              <div 
+                key={app.id} 
+                className="flex flex-col items-center group relative w-full text-center" 
+                title={isHardcoded ? `${app.name} (Always Allowed by System)` : app.name}
+              >
+                <div className="relative">
+                  {isHardcoded ? (
+                    <div className="absolute -top-1.5 -right-1.5 bg-emerald-600 text-white rounded-full p-0.5 z-10 shadow-2xs">
+                      <ShieldCheck className="w-3 h-3" />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (onSettingsChange) {
+                          onSettingsChange({
+                            allowedApps: settings.allowedApps!.filter(a => a.id !== app.id)
+                          });
+                        }
+                      }}
+                      className="absolute -top-1.5 -right-1.5 bg-gray-900 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-500 cursor-pointer shadow-xs"
+                      title="Remove App"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                  <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shadow-2xs overflow-hidden ${
+                    isHardcoded 
+                      ? 'bg-emerald-50/80 border border-emerald-200/80 text-emerald-700' 
+                      : 'bg-white border border-gray-200 text-gray-700 group-hover:bg-gray-50 transition-colors'
+                  }`}>
                     {app.iconBase64 ? (
                       <img src={`data:image/png;base64,${app.iconBase64}`} alt={app.name} className="w-full h-full object-cover p-1.5" />
                     ) : (
-                      <RenderIcon className="w-8 h-8 text-gray-700" />
+                      <FallbackIcon className={`w-7 h-7 ${isHardcoded ? 'text-emerald-700' : 'text-gray-700'}`} />
                     )}
                   </div>
-                  <span className="text-xs font-semibold text-gray-700 w-16 text-center truncate">{app.name}</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <span className="text-[11px] sm:text-xs font-semibold text-gray-700 w-full text-center truncate px-1 mt-1.5">{app.name}</span>
+                {isHardcoded && (
+                  <span className="text-[9px] font-bold uppercase tracking-tight text-emerald-600">
+                    Always
+                  </span>
+                )}
+              </div>
+            );
+          };
+
+          return (
+            <div 
+              className="max-h-80 sm:max-h-96 overflow-y-auto custom-scrollbar pr-1"
+              style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+            >
+              <div className="flex flex-col gap-y-6 py-2">
+                {customApps.length > 0 && (
+                  <div className="grid grid-cols-4 gap-y-6 gap-x-3 sm:gap-x-4">
+                    {customApps.map(app => renderAppItem(app, false))}
+                  </div>
+                )}
+                <div className="grid grid-cols-4 gap-y-6 gap-x-3 sm:gap-x-4">
+                  {hardcodedApps.map(app => renderAppItem(app, true))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
       
       {/* App Selector Modal */}
@@ -804,7 +866,9 @@ export function Dashboard({
                 </div>
               ) : (
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-y-6 gap-x-4 overflow-y-auto py-2 flex-1 pr-1">
-                  {availableApps.map((simApp) => {
+                  {availableApps
+                    .filter((simApp) => !isAppBlacklisted(simApp.id) && !isHardcodedApp(simApp) && !isHiddenSystemExemptApp(simApp.id, simApp.name))
+                    .map((simApp) => {
                     const iconMap: Record<string, React.ElementType> = {
                       'Calculator': Calculator,
                       'FileText': FileText,
@@ -812,9 +876,21 @@ export function Dashboard({
                       'Globe': Globe,
                       'BookOpen': BookOpen,
                       'MessageSquare': MessageSquare,
-                      'MonitorPlay': MonitorPlay
+                      'MonitorPlay': MonitorPlay,
+                      'Camera': Camera,
+                      'ShieldCheck': ShieldCheck,
+                      'Sparkles': Sparkles
                     };
-                    const RenderIcon = iconMap[simApp.iconName] || LayoutGrid;
+                    let FallbackIcon = iconMap[simApp.iconName] || LayoutGrid;
+                    if (isBrowserPackage(simApp.id)) FallbackIcon = Globe;
+                    else if (isMusicPackage(simApp.id, simApp.name)) FallbackIcon = Music;
+                    else if (isCameraPackage(simApp.id, simApp.name)) FallbackIcon = Camera;
+                    else if (isAuthenticatorPackage(simApp.id, simApp.name)) FallbackIcon = ShieldCheck;
+                    else if (isAiPackage(simApp.id, simApp.name)) FallbackIcon = Sparkles;
+                    else if (isNotesPackage(simApp.id, simApp.name)) FallbackIcon = FileText;
+                    else if (isStudentPackage(simApp.id, simApp.name)) FallbackIcon = BookOpen;
+                    else if (isMessagingPackage(simApp.id)) FallbackIcon = MessageSquare;
+
                     const isSelected = (settings.allowedApps || []).some(a => a.id === simApp.id);
                     
                     return (
@@ -822,7 +898,11 @@ export function Dashboard({
                         key={simApp.id}
                         onClick={() => {
                           if (!onSettingsChange) return;
-                          const current = settings.allowedApps || [];
+                          if (isAppBlacklisted(simApp.id)) {
+                            showError('This application is classified as a distraction and cannot be allowed during lockdown.');
+                            return;
+                          }
+                          const current = (settings.allowedApps || []).filter(a => !isAppBlacklisted(a.id));
                           if (isSelected) {
                             onSettingsChange({ allowedApps: current.filter(a => a.id !== simApp.id) });
                           } else {
@@ -840,7 +920,7 @@ export function Dashboard({
                           {simApp.iconBase64 ? (
                             <img src={`data:image/png;base64,${simApp.iconBase64}`} alt={simApp.name} className="w-full h-full object-cover" />
                           ) : (
-                            <RenderIcon className="w-7 h-7" />
+                            <FallbackIcon className="w-7 h-7" />
                           )}
                         </div>
                         <span className={`text-[10px] font-bold text-center w-full truncate px-1 ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>{simApp.name}</span>

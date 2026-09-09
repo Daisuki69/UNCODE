@@ -146,6 +146,81 @@ public class LockAccessibilityService extends AccessibilityService {
         "com.google.android.tts"                // Google Speech Services / Voice Typing IME
     ));
 
+    /**
+     * Known 2FA Authenticator application package IDs.
+     * Always exempt natively so students can sign into school portals and 2FA accounts.
+     */
+    private static final Set<String> KNOWN_AUTHENTICATORS = new HashSet<>(Arrays.asList(
+        "com.google.android.apps.authenticator2",
+        "com.azure.authenticator",
+        "com.duosecurity.duomobile",
+        "com.authy.authy",
+        "com.twofasapp",
+        "com.beemdevelopment.aegis",
+        "com.bitwarden.authenticator",
+        "com.lastpass.authenticator",
+        "org.fedorahosted.freeotp",
+        "com.yubico.yubioath"
+    ));
+
+    /**
+     * Known Notes & Productivity applications permanently allowed to prevent procrastination
+     * while enabling students to take notes, study, and complete homework.
+     */
+    private static final Set<String> KNOWN_NOTES_APPS = new HashSet<>(Arrays.asList(
+        "com.google.android.keep",
+        "com.samsung.android.app.notes",
+        "com.microsoft.office.onenote",
+        "notion.id",
+        "md.obsidian",
+        "com.evernote",
+        "com.socialnmobile.dictapps.notepad.color.note",
+        "com.zoho.notebook",
+        "com.automattic.simplenote",
+        "com.steadfastinnovation.android.furret",
+        "com.nebula.notes",
+        "com.colornote.notepad",
+        "com.acadoid.lecturenotes"
+    ));
+
+    /**
+     * Known Student, Coursework & Educational applications permanently allowed.
+     */
+    private static final Set<String> KNOWN_STUDENT_APPS = new HashSet<>(Arrays.asList(
+        "com.google.android.apps.classroom",
+        "com.google.android.apps.docs",
+        "com.google.android.apps.docs.editors.docs",
+        "com.google.android.apps.docs.editors.sheets",
+        "com.google.android.apps.docs.editors.slides",
+        "com.instructure.candroid",
+        "com.blackboard.android.bbmatx",
+        "com.schoology.app",
+        "com.quizlet.quizletandroid",
+        "com.ichi2.anki",
+        "com.microblink.photomath",
+        "com.desmos.calculator",
+        "org.geogebra.android",
+        "com.wolfram.android.alpha",
+        "com.microsoft.office.officehubrow",
+        "com.microsoft.office.word",
+        "com.microsoft.office.excel",
+        "com.microsoft.office.powerpoint"
+    ));
+
+    /**
+     * Known AI Assistants & Research tools permanently allowed for study assistance.
+     */
+    private static final Set<String> KNOWN_AI_APPS = new HashSet<>(Arrays.asList(
+        "com.google.android.apps.bard",
+        "com.openai.chatgpt",
+        "com.anthropic.claude",
+        "com.microsoft.copilot",
+        "ai.perplexity.app.android",
+        "com.deepseek.chat",
+        "com.quora.poe.android",
+        "ai.inflection.pi"
+    ));
+
     private final Set<String> dynamicExemptPackages = new HashSet<>();
     private final Set<String> dynamicKeyboardPackages = new HashSet<>();
     private SharedPreferences prefs;
@@ -265,10 +340,71 @@ public class LockAccessibilityService extends AccessibilityService {
                 }
             } catch (Exception ignore) {}
 
+            // Add authenticators, notes, student apps, and AI assistants to dynamic exemptions
+            dynamicExemptPackages.addAll(KNOWN_AUTHENTICATORS);
+            dynamicExemptPackages.addAll(KNOWN_NOTES_APPS);
+            dynamicExemptPackages.addAll(KNOWN_STUDENT_APPS);
+            dynamicExemptPackages.addAll(KNOWN_AI_APPS);
+
             Log.d(TAG, "Discovered dynamic exempt packages: media=" + dynamicExemptPackages.size() + ", keyboards=" + dynamicKeyboardPackages.size());
         } catch (Exception e) {
             Log.w(TAG, "Error resolving dynamic media/keyboard packages: " + e.getMessage());
         }
+    }
+
+    private boolean isAuthenticatorApp(String pkg) {
+        if (pkg == null) return false;
+        if (KNOWN_AUTHENTICATORS.contains(pkg)) return true;
+        String lower = pkg.toLowerCase();
+        return lower.contains("authenticator") || lower.contains("twofas") || lower.contains("duomobile") || lower.contains("yubioath");
+    }
+
+    private boolean isNotesApp(String pkg) {
+        if (pkg == null) return false;
+        if (KNOWN_NOTES_APPS.contains(pkg)) return true;
+        String lower = pkg.toLowerCase();
+        return lower.contains("keep") || 
+               lower.contains("onenote") || 
+               lower.contains("obsidian") || 
+               lower.contains("notion") || 
+               lower.contains("notepad") || 
+               lower.contains(".notes") || 
+               lower.contains("memo") || 
+               lower.contains("simplenote") || 
+               lower.contains("colornote");
+    }
+
+    private boolean isStudentApp(String pkg) {
+        if (pkg == null) return false;
+        if (KNOWN_STUDENT_APPS.contains(pkg)) return true;
+        String lower = pkg.toLowerCase();
+        return lower.contains("classroom") || 
+               lower.contains("canvas") || 
+               lower.contains("blackboard") || 
+               lower.contains("schoology") || 
+               lower.contains("quizlet") || 
+               lower.contains("anki") || 
+               lower.contains("desmos") || 
+               lower.contains("geogebra") || 
+               lower.contains("calculator") || 
+               lower.contains("docs.editors") || 
+               (lower.contains("google") && lower.contains("docs")) || 
+               lower.contains("photomath") || 
+               lower.contains("wolfram");
+    }
+
+    private boolean isAiApp(String pkg) {
+        if (pkg == null) return false;
+        if (KNOWN_AI_APPS.contains(pkg)) return true;
+        String lower = pkg.toLowerCase();
+        return lower.contains("chatgpt") || 
+               lower.contains("bard") || 
+               lower.contains("gemini") || 
+               lower.contains("claude") || 
+               lower.contains("copilot") || 
+               lower.contains("perplexity") || 
+               lower.contains("deepseek") || 
+               lower.contains(".poe");
     }
 
     private boolean isKeyboardApp(String pkg) {
@@ -293,6 +429,17 @@ public class LockAccessibilityService extends AccessibilityService {
         return false;
     }
 
+    private boolean isHiddenInfrastructureApp(String pkg) {
+        if (pkg == null) return false;
+        String lower = pkg.toLowerCase();
+        return lower.contains("cameraextension") ||
+               lower.contains("extensionproxy") ||
+               lower.contains("lenslauncher") ||
+               lower.contains("aperturelenslauncher") ||
+               lower.contains("opensourcemusicplayer") ||
+               lower.contains("androidopensourcemusicplayer");
+    }
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (prefs == null) {
@@ -315,10 +462,15 @@ public class LockAccessibilityService extends AccessibilityService {
         // ── Foreground app blocking ──
         if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
 
-        // Always exempt our own app, core OS, and soft keyboards
+        // Always exempt our own app, core OS, soft keyboards, authenticators, notes, student apps, AI tools, and internal camera/music infrastructure
         if (pkg.equals(getPackageName())) return;
         if (ALWAYS_EXEMPT.contains(pkg)) return;
         if (isKeyboardApp(pkg)) return;
+        if (isAuthenticatorApp(pkg)) return;
+        if (isNotesApp(pkg)) return;
+        if (isStudentApp(pkg)) return;
+        if (isAiApp(pkg)) return;
+        if (isHiddenInfrastructureApp(pkg)) return;
 
         // ── Hardcoded Distraction Blacklist Check (Strictly Takes Precedence) ──
         if (BlacklistConstants.isBlacklisted(pkg)) {
@@ -330,8 +482,8 @@ public class LockAccessibilityService extends AccessibilityService {
         // Always allow known launchers (home screen)
         if (KNOWN_LAUNCHERS.contains(pkg)) return;
 
-        // Always allow Camera, Gallery, File pickers, Web Browsers, and Music Players
-        if (MEDIA_AND_FILE_EXEMPT.contains(pkg) || dynamicExemptPackages.contains(pkg) || KNOWN_MUSIC_APPS.contains(pkg)) return;
+        // Always allow Camera, Gallery, File pickers, Web Browsers, Music Players, Authenticators, Notes, Student apps, AI
+        if (MEDIA_AND_FILE_EXEMPT.contains(pkg) || dynamicExemptPackages.contains(pkg) || KNOWN_MUSIC_APPS.contains(pkg) || isAuthenticatorApp(pkg) || isNotesApp(pkg) || isStudentApp(pkg) || isAiApp(pkg)) return;
 
         // Check against user-defined whitelist (including auto-whitelisted messaging apps)
         Set<String> whitelist = prefs.getStringSet("whitelist", new HashSet<>());

@@ -1,9 +1,10 @@
 import { registerPlugin } from '@capacitor/core';
+import { AllowedApp } from './types';
 
 interface LockPluginInterface {
   startLockdown(options: { allowedAppIds: string[] }): Promise<void>;
   endLockdown(): Promise<void>;
-  getInstalledApps(): Promise<{ apps: Array<{ id: string; name: string; iconName: string }> }>;
+  getInstalledApps(): Promise<{ apps: AllowedApp[] }>;
   checkPermissions(): Promise<{
     isDeviceOwner: boolean;
     isAccessibilityEnabled: boolean;
@@ -29,7 +30,19 @@ const LockPlugin = registerPlugin<LockPluginInterface>('LockPlugin', {
     endLockdown: async () => {
       console.log('[Dev] Simulating lockdown release');
     },
-    getInstalledApps: async () => ({ apps: [] }),
+    getInstalledApps: async () => ({
+      apps: [
+        { id: 'com.google.chrome', name: 'Chrome', iconName: 'Globe', isHardcoded: true, isBrowser: true },
+        { id: 'com.spotify.music', name: 'Spotify', iconName: 'Music', isHardcoded: true, isMusic: true },
+        { id: 'com.google.android.apps.youtube.music', name: 'YT Music', iconName: 'Music', isHardcoded: true, isMusic: true },
+        { id: 'com.sec.android.app.camera', name: 'Camera', iconName: 'Camera', isHardcoded: true, isCamera: true },
+        { id: 'com.whatsapp', name: 'WhatsApp', iconName: 'MessageSquare' },
+        { id: 'org.telegram.messenger', name: 'Telegram', iconName: 'MessageSquare' },
+        { id: 'com.apple.calculator', name: 'Calculator', iconName: 'Calculator' },
+        { id: 'com.microsoft.word', name: 'Word', iconName: 'FileText' },
+        { id: 'notion.id', name: 'Notion', iconName: 'BookOpen' }
+      ]
+    }),
     checkPermissions: async () => ({
       isDeviceOwner: true,
       isAccessibilityEnabled: true,
@@ -49,7 +62,7 @@ const LockPlugin = registerPlugin<LockPluginInterface>('LockPlugin', {
   },
 });
 
-export const getInstalledApps = async (): Promise<Array<{ id: string; name: string; iconName: string }>> => {
+export const getInstalledApps = async (): Promise<AllowedApp[]> => {
   try {
     const result = await LockPlugin.getInstalledApps();
     return result.apps || [];

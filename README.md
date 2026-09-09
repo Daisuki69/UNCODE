@@ -12,9 +12,59 @@
 
 **The uncompromising, AI-evaluated study lockdown & focus enforcement system for Android.**
 
-[Overview](#-overview) • [Connectivity & BYOK](#-online-architecture--offline-resources-byok) • [Key Features](#-key-features) • [Setup Guide](#-setup-guide) • [qiezka.bat Configuration](#%EF%B8%8F-customizing-qiezkabat) • [Security Model](#-security--anti-cheat-architecture) • [Tech Stack](#-tech-stack)
+[Philosophy](#-philosophy-procrastination-prevention) • [Overview](#-overview) • [Connectivity & BYOK](#-online-architecture--offline-resources-byok) • [Key Features](#-key-features) • [Setup Guide](#-setup-guide) • [qiezka.bat Configuration](#%EF%B8%8F-customizing-qiezkabat) • [Security Model](#-security--anti-cheat-architecture) • [Tech Stack](#-tech-stack)
 
 </div>
+
+---
+
+## 🎯 Philosophy: Procrastination Prevention
+
+> ### *"We just want students to finish their homework. We didn't say prevent them from using modern tools — the sole enemy is procrastination."*
+
+<div align="center">
+
+```
+   ╔═══════════════════════════════════════════════════════════════════════════════╗
+   ║                        THE ENEMY IS PROCRASTINATION                           ║
+   ║                         NOT RESEARCH, NOTES, OR AI                            ║
+   ╚═══════════════════════════════════════════════════════════════════════════════╝
+```
+
+</div>
+
+Most productivity blockers fail because they fall into one of two extremes:
+1. **Too Soft**: A polite reminder dialog that users swipe away in half a second.
+2. **Blindly Restrictive**: They turn the smartphone into an unusable brick, locking students out of their lecture slides, school portals, notes, or cutting-edge study tools.
+
+**QIEZKA rejects both.** 
+
+Our guiding directive is simple: **Eliminate the black holes of wasted time, while keeping the full homework and research arsenal permanently armed.**
+
+---
+
+### 🛑 What We Obliterate (The Distraction Pit)
+Algorithmically engineered dopamine traps that hijack human psychology and steal hours of student productivity:
+
+* 📱 **Short-Form Doomscrolling**: TikTok, Instagram Reels, YouTube Shorts, X/Twitter, Reddit, Facebook, Threads, CapCut.
+* 🍿 **Streaming & Piracy Black Holes**: Bilibili, KissKH (`id.kisskh.twa`), Netflix, Disney+, WeTV, iQIYI, Crunchyroll, Loklok, CloudStream, Mihon, and micro-drama reels (ReelShort, DramaBox, ShortMax).
+* 🎮 **Competitive Games & Gachas**: Roblox, Mobile Legends, Genshin Impact, Honkai: Star Rail, PUBG, Free Fire, Supercell titles, Candy Crush.
+* 🛍️ **Impulsive Shopping**: Shopee, Lazada, Amazon, Temu, Shein, AliExpress, TikTok Shop.
+* 💉 **Modded Clients & Game Hacks**: Lucky Patcher, InstaPrime, GameGuardian, ReVanced, Instander, AeroInsta.
+
+---
+
+### ⚡ What We Empower ("ALWAYS" Allowed Arsenal)
+During lockdown, students need tools to learn, calculate, write, and submit assignments. These tools are **hardcoded as always allowed** and given priority placement in the app drawer:
+
+| Category | Permitted Tools | Why It's Hardcoded Allowed |
+|---|---|---|
+| 🤖 **AI Study Assistants** | **Google Gemini, ChatGPT, Claude, Microsoft Copilot, Perplexity, DeepSeek, Poe, Pi AI** | **Why AI?** AI is the ultimate 24/7 personal tutor. If an AI helps you grasp complex physics, explain calculus, draft an outline, or debug code so you finish your homework on time, **that is a win**. The goal is conquering procrastination, not denying modern intelligence. |
+| 📝 **All Notes Apps** | **Google Keep, Samsung Notes, Microsoft OneNote, Notion, Obsidian, Evernote, ColorNote, Squid, Simplenote** | Students must always be able to jot ideas, review lecture outlines, and brainstorm without obstacles. |
+| 🎓 **Student Platforms & Storage** | **Google Classroom, Drive, Docs, Sheets, Slides, Canvas Student, Blackboard Learn, Schoology, Quizlet, AnkiDroid** | Your textbooks, problem sets, syllabi, and submission portals must never be blocked. |
+| 🧮 **STEM Calculators** | **Desmos Graphing Calculator, GeoGebra, Photomath, WolframAlpha, system calculators** | Modern coursework requires computing and graphing horsepower. |
+| 🛡️ **2FA Authenticators** | **Google Authenticator, Microsoft Authenticator, Duo Mobile, Authy, 2FAS, Aegis, Bitwarden** | Zero lockouts. Signing into university portals and Google accounts must remain frictionless. |
+| 🎵 **Deep Focus Audio & Browsers** | **Spotify, YouTube Music, Apple Music, Tidal, Chrome, Firefox, Brave** | Deep work requires a flow state. Background binaural beats, lo-fi study tracks, and web research are always accessible. |
 
 ---
 

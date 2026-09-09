@@ -26,6 +26,14 @@ export interface AllowedApp {
   name: string;
   iconName: string;
   iconBase64?: string;
+  isHardcoded?: boolean;
+  isBrowser?: boolean;
+  isMusic?: boolean;
+  isCamera?: boolean;
+  isAuthenticator?: boolean;
+  isNotes?: boolean;
+  isStudentApp?: boolean;
+  isAi?: boolean;
 }
 
 export interface AppSettings {
@@ -41,6 +49,7 @@ export interface AppSettings {
   uiScale?: number;
   uiWidth?: string;
   allowedApps?: AllowedApp[];
+  allowedAppsInitialized?: boolean;
 }
 
 export interface EvaluationResult {

@@ -1,21 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { AppState, AppSettings, EvaluationResult as IEvaluationResult, ScheduleData, SavedResource, LogEntry } from './types';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { AppState, AppSettings, EvaluationResult as IEvaluationResult, ScheduleData, SavedResource, LogEntry, AllowedApp } from './types';
 import { Dashboard } from './components/Dashboard';
 import { LockScreen } from './components/LockScreen';
 import { EvaluationResult } from './components/EvaluationResult';
 import { Onboarding } from './components/Onboarding';
-import { CreateSchedule } from './components/CreateSchedule';
-import { SettingsOverlay } from './components/SettingsOverlay';
-import { EditRubric } from './components/EditRubric';
-import { HomeworksPage } from './components/HomeworksPage';
 import { Loader2, AlertTriangle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { startLockdown, endLockdown } from './systemBridge';
-import { evaluate } from './api/evaluate';
-import { declutterResource } from './api/declutterResource';
-import { PermissionWalkthrough } from './components/PermissionWalkthrough';
-import { checkPermissions } from './systemBridge';
+import { startLockdown, endLockdown, getInstalledApps, checkPermissions } from './systemBridge';
 import { loadData, saveData } from './storage';
+import { isAppBlacklisted } from './constants/blacklistedApps';
+import { isMessagingPackage, isHiddenSystemExemptApp } from './constants/allowedApps';
+
+// Code-split secondary views to keep initial bundle ultra-lightweight and fast to load
+const CreateSchedule = React.lazy(() => import('./components/CreateSchedule').then(m => ({ default: m.CreateSchedule })));
+const SettingsOverlay = React.lazy(() => import('./components/SettingsOverlay').then(m => ({ default: m.SettingsOverlay })));
+const EditRubric = React.lazy(() => import('./components/EditRubric').then(m => ({ default: m.EditRubric })));
+const HomeworksPage = React.lazy(() => import('./components/HomeworksPage').then(m => ({ default: m.HomeworksPage })));
+const PermissionWalkthrough = React.lazy(() => import('./components/PermissionWalkthrough').then(m => ({ default: m.PermissionWalkthrough })));
 
 const modalVariants = {
   initial: { opacity: 0 },
@@ -160,6 +161,14 @@ export default function App() {
   };
 
   const [resources, setResources] = useState<SavedResource[]>([]);
+  const [installedApps, setInstalledApps] = useState<AllowedApp[]>(() => {
+    try {
+      const cached = localStorage.getItem('studom_installed_apps');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     if (isLoaded) saveData('studom_settings', settings);
@@ -172,7 +181,14 @@ export default function App() {
   // Load all data on mount
   useEffect(() => {
     async function loadAll() {
-      const loadedSettings = await loadData<AppSettings>('studom_settings', { onboardingComplete: false, role: 'just a guy', schedules: [] });
+      // 1. Parallelize all persistent storage reads (finishes in <10ms)
+      const [loadedSettings, loadedResources, loadedLogs, loadedCompletedHomeworks, loadedTimeOffset] = await Promise.all([
+        loadData<AppSettings>('studom_settings', { onboardingComplete: false, role: 'just a guy', schedules: [] }),
+        loadData<SavedResource[]>('studom_resources', []),
+        loadData<LogEntry[]>('studom_logs', []),
+        loadData<import('./types').CompletedHomework[]>('studom_completed_homeworks', []),
+        loadData<number>('studom_timeOffset', 0)
+      ]);
       
       // Migrate old schedule
       if ((loadedSettings as any).schedule && !loadedSettings.schedules) {
@@ -182,13 +198,49 @@ export default function App() {
         loadedSettings.schedules = [];
       }
 
+      if (loadedSettings.allowedApps) {
+        loadedSettings.allowedApps = loadedSettings.allowedApps.filter(a => !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name));
+      }
+
+      // Check cached installed apps for initial messaging app auto-population if needed
+      if (!loadedSettings.allowedAppsInitialized && installedApps.length > 0) {
+        const messagingApps = installedApps.filter(a => isMessagingPackage(a.id) && !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name));
+        if (messagingApps.length > 0) {
+          loadedSettings.allowedApps = messagingApps;
+        }
+        loadedSettings.allowedAppsInitialized = true;
+      }
+
       setSettings(loadedSettings);
       setAppState(loadedSettings.onboardingComplete ? 'dashboard' : 'onboarding');
-      setResources(await loadData<SavedResource[]>('studom_resources', []));
-      setLogs(await loadData<LogEntry[]>('studom_logs', []));
-      setCompletedHomeworks(await loadData<import('./types').CompletedHomework[]>('studom_completed_homeworks', []));
-      setTimeOffset(await loadData<number>('studom_timeOffset', 0));
+      setResources(loadedResources);
+      setLogs(loadedLogs);
+      setCompletedHomeworks(loadedCompletedHomeworks);
+      setTimeOffset(loadedTimeOffset);
+      // Immediately mark as loaded to instantly render the app screen
       setIsLoaded(true);
+
+      // 2. Query fresh installed apps asynchronously in background without holding the loading screen
+      getInstalledApps().then(installed => {
+        if (installed && installed.length > 0) {
+          setInstalledApps(installed);
+          try { localStorage.setItem('studom_installed_apps', JSON.stringify(installed)); } catch {}
+
+          setSettings(prev => {
+            if (!prev.allowedAppsInitialized) {
+              const messagingApps = installed.filter(a => isMessagingPackage(a.id) && !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name));
+              return {
+                ...prev,
+                allowedApps: messagingApps.length > 0 ? messagingApps : prev.allowedApps,
+                allowedAppsInitialized: true
+              };
+            }
+            return prev;
+          });
+        }
+      }).catch(e => {
+        console.warn("Background getInstalledApps failed", e);
+      });
     }
     loadAll();
   }, []);
@@ -249,7 +301,8 @@ export default function App() {
           setLockEndTime(lockEnd);
           setActiveScheduleId(schedule.id);
           if (appState !== 'locked' && appState !== 'evaluating' && appState !== 'result') {
-            startLockdown(settings.allowedApps?.map(a => a.id) || []);
+            const safeAllowedApps = (settings.allowedApps || []).filter(a => !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name));
+            startLockdown(safeAllowedApps.map(a => a.id));
             navigate('locked');
           }
           foundActive = true;
@@ -326,8 +379,18 @@ export default function App() {
     navigate('dashboard', 'backward');
   }, [activeScheduleId]);
 
-  const handleCompleteOnboarding = (role: 'student' | 'teacher' | 'just a guy') => {
-    setSettings(prev => ({ ...prev, onboardingComplete: true, role }));
+  const handleCompleteOnboarding = async (role: 'student' | 'teacher' | 'just a guy') => {
+    let initialAllowed = (settings.allowedApps || []).filter(a => !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name));
+    if (!settings.allowedAppsInitialized) {
+      try {
+        const installed = installedApps.length > 0 ? installedApps : await getInstalledApps();
+        const messagingApps = (installed || []).filter(a => isMessagingPackage(a.id) && !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name));
+        if (messagingApps.length > 0) {
+          initialAllowed = messagingApps;
+        }
+      } catch (e) {}
+    }
+    setSettings(prev => ({ ...prev, onboardingComplete: true, role, allowedApps: initialAllowed, allowedAppsInitialized: true }));
     navigate('dashboard', 'forward');
   };
 
@@ -393,6 +456,7 @@ export default function App() {
     const activeSchedule = settings.schedules?.find(s => s.id === scheduleId);
 
     try {
+      const { evaluate } = await import('./api/evaluate');
       const data = await evaluate({
         transcribedText,
         rubric: activeSchedule?.rubricContent || '',
@@ -418,21 +482,23 @@ export default function App() {
         if (activeSchedule?.selectedResourceIds?.includes('ai-general-knowledge')) {
           const textToHarvest = activeSchedule.aiAnswer || transcribedText || data.transcribedText;
           if (textToHarvest) {
-            // Background call to declutter and save
-            declutterResource({
-              title: 'AI Research: ' + (activeSchedule.title || 'Topic'),
-              content: textToHarvest,
-              apiKey: settings.apiKey || '',
-              apiModel: settings.apiModel || 'gemini-2.0-flash',
-              customPrompts: settings.prompts,
-            }).then(harvestData => {
-              const realResources = activeSchedule.selectedResourceIds!.filter(id => id !== 'ai-general-knowledge');
-              if (realResources.length > 0) {
-                setResources(prev => prev.map(r => r.id === realResources[0] ? { ...r, content: r.content + '\n\n' + harvestData.content } : r));
-              } else {
-                setResources(prev => [...prev, { id: crypto.randomUUID(), title: harvestData.title || 'AI Research', content: harvestData.content, createdAt: Date.now() }]);
-              }
-            }).catch(console.error);
+            // Background call to declutter and save via dynamic import
+            import('./api/declutterResource').then(({ declutterResource }) => {
+              declutterResource({
+                title: 'AI Research: ' + (activeSchedule.title || 'Topic'),
+                content: textToHarvest,
+                apiKey: settings.apiKey || '',
+                apiModel: settings.apiModel || 'gemini-2.0-flash',
+                customPrompts: settings.prompts,
+              }).then(harvestData => {
+                const realResources = activeSchedule.selectedResourceIds!.filter(id => id !== 'ai-general-knowledge');
+                if (realResources.length > 0) {
+                  setResources(prev => prev.map(r => r.id === realResources[0] ? { ...r, content: r.content + '\n\n' + harvestData.content } : r));
+                } else {
+                  setResources(prev => [...prev, { id: crypto.randomUUID(), title: harvestData.title || 'AI Research', content: harvestData.content, createdAt: Date.now() }]);
+                }
+              }).catch(console.error);
+            });
           }
         }
 
@@ -531,44 +597,49 @@ export default function App() {
                 setEditingRubricScheduleId(schedule.id);
                 navigate('edit_rubric');
               }}
+              installedApps={installedApps}
             />
           </motion.div>
         )}
 
         {appState === 'create_schedule' && (
           <motion.div key="create_schedule" custom={navDirection} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3, ease: 'easeOut' }} className="absolute inset-0 overflow-y-auto bg-gray-50 flex flex-col w-full h-full">
-            <CreateSchedule showError={setGlobalError} 
-              role={settings.role}
-              resources={resources}
-              apiKey={settings.apiKey}
-              apiModel={settings.apiModel}
-              existingSchedules={settings.schedules || []}
-              settings={settings}
-              addLog={addLog}
-              onSave={handleSaveSchedule}
-              onCancel={() => navigate('dashboard', 'backward')}
-            />
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center p-12 text-red-500"><Loader2 className="w-8 h-8 animate-spin" /></div>}>
+              <CreateSchedule showError={setGlobalError} 
+                role={settings.role}
+                resources={resources}
+                apiKey={settings.apiKey}
+                apiModel={settings.apiModel}
+                existingSchedules={settings.schedules || []}
+                settings={settings}
+                addLog={addLog}
+                onSave={handleSaveSchedule}
+                onCancel={() => navigate('dashboard', 'backward')}
+              />
+            </Suspense>
           </motion.div>
         )}
 
         {appState === 'edit_rubric' && editingRubricScheduleId && (
           <motion.div key="edit_rubric" custom={navDirection} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3, ease: 'easeOut' }} className="absolute inset-0 overflow-y-auto bg-gray-50 flex flex-col w-full h-full">
-            <EditRubric
-              schedule={settings.schedules.find(s => s.id === editingRubricScheduleId)!}
-              resources={resources}
-              apiKey={settings.apiKey}
-              apiModel={settings.apiModel}
-              role={settings.role}
-              onSave={(updatedSchedule) => {
-                setSettings(prev => ({
-                  ...prev,
-                  schedules: prev.schedules.map(s => s.id === updatedSchedule.id ? updatedSchedule : s)
-                }));
-                navigate('dashboard', 'backward');
-              }}
-              onCancel={() => navigate('dashboard', 'backward')}
-              showError={setGlobalError}
-            />
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center p-12 text-red-500"><Loader2 className="w-8 h-8 animate-spin" /></div>}>
+              <EditRubric
+                schedule={settings.schedules.find(s => s.id === editingRubricScheduleId)!}
+                resources={resources}
+                apiKey={settings.apiKey}
+                apiModel={settings.apiModel}
+                role={settings.role}
+                onSave={(updatedSchedule) => {
+                  setSettings(prev => ({
+                    ...prev,
+                    schedules: prev.schedules.map(s => s.id === updatedSchedule.id ? updatedSchedule : s)
+                  }));
+                  navigate('dashboard', 'backward');
+                }}
+                onCancel={() => navigate('dashboard', 'backward')}
+                showError={setGlobalError}
+              />
+            </Suspense>
           </motion.div>
         )}
 
@@ -586,12 +657,13 @@ export default function App() {
               timeOffset={timeOffset}
               onResetTime={() => setTimeOffset(0)}
               onSettingsChange={(updates) => setSettings(prev => ({ ...prev, ...updates }))}
+              installedApps={installedApps}
             />
           </motion.div>
         )}
 
         {appState === 'result' && evaluationResult && (
-          <motion.div key="result" custom={navDirection} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3, ease: 'easeOut' }} className="absolute inset-0 overflow-y-auto bg-gray-50 flex flex-col w-full h-full">
+          <motion.div key="result" custom={navDirection} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3, ease: 'easeOut' }} className="absolute inset-0 overflow-y-auto bg-gray-50 flex flex-col w-full h-full" style={{ WebkitOverflowScrolling: 'touch' }}>
             <EvaluationResult 
               result={evaluationResult}
               onReset={() => {
@@ -612,7 +684,9 @@ export default function App() {
 
         {appState === 'permission_walkthrough' && (
           <motion.div key="permission_walkthrough" custom={navDirection} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3, ease: 'easeOut' }} className="absolute inset-0 overflow-y-auto flex flex-col w-full h-full z-50">
-            <PermissionWalkthrough onComplete={() => navigate('dashboard')} />
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center p-12 text-red-500"><Loader2 className="w-8 h-8 animate-spin" /></div>}>
+              <PermissionWalkthrough onComplete={() => navigate('dashboard')} />
+            </Suspense>
           </motion.div>
         )}
 
@@ -622,25 +696,29 @@ export default function App() {
       <AnimatePresence>
         {appState === 'logs' && (
           <ModalTransition keyStr="logs">
-            <HomeworksPage 
-              homeworks={completedHomeworks}
-              onBack={() => navigate('dashboard', 'backward')}
-              onClear={() => setCompletedHomeworks([])}
-            />
+            <Suspense fallback={<div className="p-8 flex items-center justify-center text-red-500"><Loader2 className="w-8 h-8 animate-spin" /></div>}>
+              <HomeworksPage 
+                homeworks={completedHomeworks}
+                onBack={() => navigate('dashboard', 'backward')}
+                onClear={() => setCompletedHomeworks([])}
+              />
+            </Suspense>
           </ModalTransition>
         )}
         {appState === 'settings' && (
           <ModalTransition keyStr="settings">
-            <SettingsOverlay
-              settings={settings}
-              logs={logs}
-              onClearLogs={() => setLogs([])}
-              onSave={(updates) => {
-                setSettings(prev => ({ ...prev, ...updates }));
-                navigate('dashboard', 'backward');
-              }}
-              onClose={() => navigate('dashboard', 'backward')}
-            />
+            <Suspense fallback={<div className="p-8 flex items-center justify-center text-red-500"><Loader2 className="w-8 h-8 animate-spin" /></div>}>
+              <SettingsOverlay
+                settings={settings}
+                logs={logs}
+                onClearLogs={() => setLogs([])}
+                onSave={(updates) => {
+                  setSettings(prev => ({ ...prev, ...updates }));
+                  navigate('dashboard', 'backward');
+                }}
+                onClose={() => navigate('dashboard', 'backward')}
+              />
+            </Suspense>
           </ModalTransition>
         )}
       </AnimatePresence>

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, Key, Save, Trash2, Cpu, FileText, Wand2, RefreshCw, ArrowLeft, Clock, Activity, Globe } from 'lucide-react';
-import { AppSettings, LogEntry, SavedResource } from '../types';
+import { AppSettings, LogEntry, SavedResource, AllowedApp } from '../types';
 import { defaultPrompts as staticDefaultPrompts } from '../../defaultPrompts';
 import { refinePrompt } from '../api/refinePrompt';
 import { loadData, saveData } from '../storage';
 import { exportBackup } from '../systemBridge';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { isHardcodedApp, isHiddenSystemExemptApp } from '../constants/allowedApps';
+import { isAppBlacklisted } from '../constants/blacklistedApps';
 
 interface SettingsOverlayProps {
   settings: AppSettings;
@@ -53,8 +55,19 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
 
   const handleExport = async () => {
     try {
+      const currentSettings = await loadData<AppSettings>('studom_settings', settings);
+      const allAllowed = currentSettings.allowedApps || settings.allowedApps || [];
+      const customApps = allAllowed.filter(
+        (app: AllowedApp) => !isHardcodedApp(app) && !isAppBlacklisted(app.id) && !isHiddenSystemExemptApp(app.id, app.name)
+      );
+
       const allData = {
-        settings: await loadData<AppSettings>('studom_settings', settings),
+        settings: {
+          ...currentSettings,
+          allowedApps: allAllowed
+        },
+        customApps: customApps,
+        allowedApps: allAllowed,
         resources: await loadData<SavedResource[]>('studom_resources', []),
         logs: await loadData<LogEntry[]>('studom_logs', []),
         completedHomeworks: await loadData<any[]>('studom_completed_homeworks', []),
@@ -93,7 +106,24 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
         try {
           const text = e2.target?.result as string;
           const data = JSON.parse(text);
-          if (data.settings) await saveData('studom_settings', data.settings);
+          if (data.settings) {
+            const rawAllowed = data.customApps || data.allowedApps || data.settings.allowedApps;
+            if (rawAllowed && Array.isArray(rawAllowed)) {
+              data.settings.allowedApps = rawAllowed.filter(
+                (a: AllowedApp) => a && a.id && !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name)
+              );
+              data.settings.allowedAppsInitialized = true;
+            }
+            await saveData('studom_settings', data.settings);
+          } else if (data.customApps || data.allowedApps) {
+            const currentSettings = await loadData<AppSettings>('studom_settings', settings);
+            const rawAllowed = data.customApps || data.allowedApps;
+            currentSettings.allowedApps = rawAllowed.filter(
+              (a: AllowedApp) => a && a.id && !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name)
+            );
+            currentSettings.allowedAppsInitialized = true;
+            await saveData('studom_settings', currentSettings);
+          }
           if (data.resources) await saveData('studom_resources', data.resources);
           if (data.logs) await saveData('studom_logs', data.logs);
           if (data.completedHomeworks) await saveData('studom_completed_homeworks', data.completedHomeworks);
@@ -346,7 +376,7 @@ export function SettingsOverlay({ settings, logs, onSave, onClearLogs, onClose }
                     </button>
                   </div>
                   <p className="text-xs text-gray-400 mt-3 text-center">
-                    Exports everything including your massive resources, schedules, and logs into a single .json file.
+                    Exports everything including your custom allowed apps, resources, schedules, and logs into a single .json file.
                   </p>
                 </div>
             </div>

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Upload, Camera, FileWarning, CheckCircle, Sparkles, X, Loader2, RefreshCcw, Calculator, FileText, Music, Globe, MessageSquare, MonitorPlay, BookOpen, LayoutGrid, AlertTriangle } from 'lucide-react';
+import { Lock, Upload, Camera, FileWarning, CheckCircle, Sparkles, X, Loader2, RefreshCcw, Calculator, FileText, Music, Globe, MessageSquare, MonitorPlay, BookOpen, LayoutGrid, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
-import { ScheduleData, AppSettings, SavedResource } from '../types';
+import { ScheduleData, AppSettings, SavedResource, AllowedApp } from '../types';
 import { parseResource } from '../api/parseResource';
 import { generateAnswer } from '../api/generateAnswer';
 import { endLockdown } from '../systemBridge';
+import { isAppBlacklisted } from '../constants/blacklistedApps';
+import { DEFAULT_HARDCODED_APPS, isHardcodedApp, isBrowserPackage, isMusicPackage, isCameraPackage, isAuthenticatorPackage, isMessagingPackage, isKeyboardPackage, isHiddenSystemExemptApp, isNotesPackage, isStudentPackage, isAiPackage } from '../constants/allowedApps';
 
 interface LockScreenProps {
   schedule: ScheduleData;
@@ -18,9 +20,10 @@ interface LockScreenProps {
   timeOffset?: number;
   onResetTime?: () => void;
   onSettingsChange?: (updates: Partial<AppSettings>) => void;
+  installedApps?: AllowedApp[];
 }
 
-export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmitHomework, onTimeout, getCurrentTime, onTimeOverride, timeOffset, onResetTime, onSettingsChange }: LockScreenProps) {
+export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmitHomework, onTimeout, getCurrentTime, onTimeOverride, timeOffset, onResetTime, onSettingsChange, installedApps = [] }: LockScreenProps) {
   const [timeLeft, setTimeLeft] = useState(() => Math.max(0, Math.floor((lockEndTime - getCurrentTime()) / 1000)));
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -542,38 +545,104 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
           )}
         </div>
         
-        {(settings.allowedApps && settings.allowedApps.length > 0) && (
-          <div className="w-full bg-gray-900 border border-gray-800 rounded-2xl p-6 mt-8">
-            <h4 className="text-gray-500 font-bold uppercase text-xs mb-4 flex items-center justify-center">
-              <LayoutGrid className="w-4 h-4 mr-2" /> Allowed Applications During Lock
-            </h4>
-            <div className="flex flex-wrap justify-center gap-3">
-              {settings.allowedApps.map(app => {
-                const iconMap: Record<string, React.ElementType> = {
-                  'Calculator': Calculator,
-                  'FileText': FileText,
-                  'Music': Music,
-                  'Globe': Globe,
-                  'BookOpen': BookOpen,
-                  'MessageSquare': MessageSquare,
-                  'MonitorPlay': MonitorPlay
-                };
-                const RenderIcon = iconMap[app.iconName] || LayoutGrid;
-                
-                return (
-                  <div key={app.id} className="flex items-center bg-black/40 border border-gray-800 rounded-xl py-2 px-4 shadow-sm">
-                    {app.iconBase64 ? (
-                      <img src={`data:image/png;base64,${app.iconBase64}`} alt={app.name} className="w-5 h-5 mr-2 object-cover rounded-sm" />
-                    ) : (
-                      <RenderIcon className="w-5 h-5 text-gray-400 mr-2" />
+        <div className="w-full bg-gray-900 border border-gray-800 rounded-2xl p-6 mt-8">
+          <h4 className="text-gray-400 font-bold uppercase text-xs mb-4 flex items-center justify-center">
+            <LayoutGrid className="w-4 h-4 mr-2" /> Accessible Applications During Lock
+          </h4>
+
+          {(() => {
+            const detectedHardcoded = (installedApps || []).filter(app => !isAppBlacklisted(app.id) && isHardcodedApp(app) && !isHiddenSystemExemptApp(app.id, app.name));
+            const hardcodedApps: AllowedApp[] = detectedHardcoded.length > 0 ? detectedHardcoded : DEFAULT_HARDCODED_APPS;
+
+            const customApps = (settings.allowedApps || []).filter(app => 
+              !isAppBlacklisted(app.id) && 
+              !isHardcodedApp(app) &&
+              !isHiddenSystemExemptApp(app.id, app.name) &&
+              !hardcodedApps.some(h => h.id === app.id)
+            );
+
+            const unifiedLockApps: Array<AllowedApp & { isHardcoded: boolean }> = [
+              ...hardcodedApps.map(h => ({ ...h, isHardcoded: true })),
+              ...customApps.map(c => ({ ...c, isHardcoded: false }))
+            ];
+
+            const iconMap: Record<string, React.ElementType> = {
+              'Calculator': Calculator,
+              'FileText': FileText,
+              'Music': Music,
+              'Globe': Globe,
+              'BookOpen': BookOpen,
+              'MessageSquare': MessageSquare,
+              'MonitorPlay': MonitorPlay,
+              'Camera': Camera,
+              'ShieldCheck': ShieldCheck,
+              'Sparkles': Sparkles
+            };
+
+            const renderLockAppItem = (app: AllowedApp, isHardcoded: boolean) => {
+              let FallbackIcon = iconMap[app.iconName] || LayoutGrid;
+              if (isBrowserPackage(app.id)) FallbackIcon = Globe;
+              else if (isMusicPackage(app.id, app.name)) FallbackIcon = Music;
+              else if (isCameraPackage(app.id, app.name)) FallbackIcon = Camera;
+              else if (isAuthenticatorPackage(app.id, app.name)) FallbackIcon = ShieldCheck;
+              else if (isAiPackage(app.id, app.name)) FallbackIcon = Sparkles;
+              else if (isNotesPackage(app.id, app.name)) FallbackIcon = FileText;
+              else if (isStudentPackage(app.id, app.name)) FallbackIcon = BookOpen;
+              else if (isMessagingPackage(app.id)) FallbackIcon = MessageSquare;
+
+              return (
+                <div 
+                  key={app.id} 
+                  className="flex flex-col items-center group relative w-full text-center" 
+                  title={isHardcoded ? `${app.name} (Always Allowed by System)` : app.name}
+                >
+                  <div className="relative">
+                    {isHardcoded && (
+                      <div className="absolute -top-1.5 -right-1.5 bg-emerald-600 text-white rounded-full p-0.5 z-10 shadow-2xs">
+                        <ShieldCheck className="w-3 h-3" />
+                      </div>
                     )}
-                    <span className="text-sm font-semibold text-gray-300">{app.name}</span>
+                    <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shadow-md overflow-hidden ${
+                      isHardcoded 
+                        ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-400' 
+                        : 'bg-gray-800/80 border border-gray-700 text-gray-300'
+                    }`}>
+                      {app.iconBase64 ? (
+                        <img src={`data:image/png;base64,${app.iconBase64}`} alt={app.name} className="w-full h-full object-cover p-1.5" />
+                      ) : (
+                        <FallbackIcon className={`w-7 h-7 ${isHardcoded ? 'text-emerald-400' : 'text-gray-300'}`} />
+                      )}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                  <span className="text-[11px] sm:text-xs font-medium text-gray-300 w-full text-center truncate px-1 mt-1.5">{app.name}</span>
+                  {isHardcoded && (
+                    <span className="text-[9px] font-bold uppercase tracking-tight text-emerald-400 mt-0.5">
+                      Always
+                    </span>
+                  )}
+                </div>
+              );
+            };
+
+            return (
+              <div 
+                className="max-h-72 sm:max-h-88 overflow-y-auto custom-scrollbar pr-1 w-full"
+                style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+              >
+                <div className="flex flex-col gap-y-6 max-w-sm sm:max-w-md mx-auto w-full py-2">
+                  {customApps.length > 0 && (
+                    <div className="grid grid-cols-4 gap-y-6 gap-x-3 sm:gap-x-4 w-full">
+                      {customApps.map(app => renderLockAppItem(app, false))}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-4 gap-y-6 gap-x-3 sm:gap-x-4 w-full">
+                    {hardcodedApps.map(app => renderLockAppItem(app, true))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       </div>
 
       {showAnswerPopup && (
