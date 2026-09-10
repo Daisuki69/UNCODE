@@ -2,17 +2,40 @@
 
 <div align="center">
 
-![Platform](https://img.shields.io/badge/Platform-Android%2010%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
-![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%7C%20TypeScript-61DAFB?style=for-the-badge&logo=react&logoColor=black)
-![Bridge](https://img.shields.io/badge/Bridge-Capacitor%207-119EFF?style=for-the-badge&logo=capacitor&logoColor=white)
-![AI Engine](https://img.shields.io/badge/AI%20Evaluation-Google%20Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)
-![API Model](https://img.shields.io/badge/API-Bring%20Your%20Own%20Key%20(BYOK)-FF9800?style=for-the-badge)
-![Offline Support](https://img.shields.io/badge/Offline-Resources%20%26%20Lockdown-2196F3?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+```
+   ██████╗ ██╗███████╗███████╗██╗  ██╗ █████╗ 
+  ██╔═══██╗██║██╔════╝╚══███╔╝██║ ██╔╝██╔══██╗
+  ██║   ██║██║█████╗    ███╔╝ █████╔╝ ███████║
+  ██║▄▄ ██║██║██╔══╝   ███╔╝  ██╔═██╗ ██╔══██║
+  ╚██████╔╝██║███████╗███████╗██║  ██╗██║  ██║
+   ╚══▀▀═╝ ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
+```
 
-**The uncompromising, AI-evaluated study lockdown & focus enforcement system for Android.**
+### *The Uncompromising, AI-Evaluated Study Lockdown & Focus Enforcement System for Android*
 
-[Philosophy](#-philosophy-procrastination-prevention) • [Blocked & Allowed Apps](#-complete-application-reference-blocked--allowed) • [Overview](#-overview) • [Connectivity & BYOK](#-online-architecture--offline-resources-byok) • [Key Features](#-key-features) • [Setup Guide](#-setup-guide) • [qiezka.bat Configuration](#%EF%B8%8F-customizing-qiezkabat) • [Security Model](#-security--anti-cheat-architecture) • [Tech Stack](#-tech-stack)
+[![Android](https://img.shields.io/badge/Platform-Android%2010%20to%2016%20(API%2029--36)-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/)
+[![React](https://img.shields.io/badge/Frontend-React%2019%20%7C%20TypeScript-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Capacitor](https://img.shields.io/badge/Bridge-Capacitor%207-119EFF?style=for-the-badge&logo=capacitor&logoColor=white)](https://capacitorjs.com/)
+[![Vite](https://img.shields.io/badge/Bundler-Vite%206-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind](https://img.shields.io/badge/Styling-Tailwind%20CSS%204-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Google Gemini](https://img.shields.io/badge/AI%20Evaluation-Google%20Gemini%202.0%20%2F%202.5-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)](https://aistudio.google.com/)
+[![Security](https://img.shields.io/badge/Security-Device%20Admin%20%2B%20Accessibility-E91E63?style=for-the-badge)](https://developer.android.com/guide/topics/admin/device-admin)
+[![Overlay](https://img.shields.io/badge/Overlay-Floating%20Ball%20Timer-FF5722?style=for-the-badge)](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_APPLICATION_OVERLAY)
+[![API Model](https://img.shields.io/badge/Privacy-100%25%20BYOK%20Zero--Telemetry-00C853?style=for-the-badge)](#-online-architecture--offline-resources-byok)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+
+<br/>
+
+**[⚡ Philosophy](#-philosophy-procrastination-prevention)** • 
+**[⚖️ Comparison Matrix](#%EF%B8%8F-qiezka-vs-traditional-app-blockers)** • 
+**[🏗️ Architecture](#%EF%B8%8F-system-architecture)** • 
+**[🔮 Floating Ball Overlay](#-floating-assistive-timer-ball)** • 
+**[📋 App Directory](#-complete-application-reference-blocked--allowed)** • 
+**[🛡️ Anti-Cheat & Security](#%EF%B8%8F-security--anti-cheat-architecture)** • 
+**[🚀 Setup & ADB](#-setup-guide)** • 
+**[📱 OEM Guides](#-oem-rom-optimization-guide)** • 
+**[📂 Codebase Tour](#-codebase-architecture--tour)** • 
+**[❓ FAQ](#-frequently-asked-questions-faq)**
 
 </div>
 
@@ -25,26 +48,61 @@
 <div align="center">
 
 ```
-   ╔═══════════════════════════════════════════════════════════════════════════════╗
-   ║                        THE ENEMY IS PROCRASTINATION                           ║
-   ║                         NOT RESEARCH, NOTES, OR AI                            ║
-   ╚═══════════════════════════════════════════════════════════════════════════════╝
+   ╔═══════════════════════════════════════════════════════════════════════════════════╗
+   ║                           THE ENEMY IS PROCRASTINATION                            ║
+   ║                            NOT RESEARCH, NOTES, OR AI                             ║
+   ╚═══════════════════════════════════════════════════════════════════════════════════╝
 ```
 
 </div>
 
-Most productivity blockers fail because they fall into one of two extremes:
-1. **Too Soft**: A polite reminder dialog that users swipe away in half a second.
-2. **Blindly Restrictive**: They turn the smartphone into an unusable brick, locking students out of their lecture slides, school portals, notes, or cutting-edge study tools.
+Most productivity apps on Android and iOS fail because they operate at one of two counterproductive extremes:
 
-**QIEZKA rejects both.** 
+1. **The "Honor System" (Too Soft)**: Apps like *Forest*, *StayFree*, or standard Pomodoro timers show polite reminder dialogs, draw virtual trees, or set soft timers. When a student feels cognitive friction or boredom, they dismiss the dialog with a single swipe, disable the timer, and plunge right back into endless scrolling.
+2. **The "Dumb Phone" Brick (Blindly Restrictive)**: Traditional kiosk and extreme lockdown tools disable the entire phone or block every app except phone calls. This completely ruins modern academic workflows: students can't access lecture slides in Google Drive, consult PDF textbooks in Adobe Acrobat, write down thoughts in Obsidian or Samsung Notes, translate Latin or German homework in DeepL, or ask Google Gemini to explain a complex physics derivation.
 
-Our guiding directive is simple: **Eliminate the black holes of wasted time, while keeping the full homework and research arsenal permanently armed.**
+**QIEZKA rejects both extremes.**
+
+Our design directive is uncompromising: **Obliterate the algorithmic dopamine pits of wasted time, while keeping the full homework, research, and AI arsenal permanently armed and accessible.**
+
+```
+   ┌─────────────────────────────────────────────────────────────────────────────────┐
+   │                               THE QIEZKA TRINITY                                │
+   ├─────────────────────────────────┬───────────────────────────────────────────────┤
+   │ 🔒 HARD ENFORCEMENT             │ You cannot cancel, dismiss, or swipe away     │
+   │                                 │ the session. Uninstallation is blocked.       │
+   ├─────────────────────────────────┼───────────────────────────────────────────────┤
+   │ 🧠 INTELLECTUAL FREEDOM         │ AI tutors, notes, LMS portals, STEM solvers,  │
+   │                                 │ and research tools are ALWAYS permitted.      │
+   ├─────────────────────────────────┼───────────────────────────────────────────────┤
+   │ 📸 PROOF-OF-WORK VERIFICATION   │ The phone does NOT unlock by waiting. You     │
+   │                                 │ must photograph your completed homework and   │
+   │                                 │ pass multimodal AI grading to escape.         │
+   └─────────────────────────────────┴───────────────────────────────────────────────┘
+```
 
 ---
 
-### 🛑 What We Obliterate (The Distraction Pit)
-Algorithmically engineered dopamine traps that hijack human psychology and steal hours of student productivity:
+## ⚖️ QIEZKA vs Traditional App Blockers
+
+| Feature | Standard Blockers *(Forest, Opal, StayFree)* | Kiosk / "Dumb Phone" Bricks | ⚡ QIEZKA Focus Enforcement System |
+|---|---|---|---|
+| **Exit Mechanism** | Cancel button or wait out timer | Wait out timer or reboot device | **Submit handwritten homework photo & pass AI evaluation** |
+| **Uninstall Prevention** | Easily uninstalled in Android Settings | Requires paid MDM subscription | **Device Administrator + Accessibility Settings Lockout** |
+| **AI Assistants (Gemini, ChatGPT)** | Usually blocked or unmanaged | Strictly blocked | **Hardcoded ALWAYS allowed (AI is your 24/7 tutor)** |
+| **Document Pickers & Media** | Often crash when browsing files | Crashed or disabled | **System DocumentUI & SAF providers fully exempt** |
+| **Floating HUD Timer** | None or simple status bar notification | None (entire UI locked) | **Draggable, edge-snapping Floating Ball Overlay (`WindowManager`)** |
+| **Notification Shade Protection** | Can pull down Quick Settings & Airplane Mode | Often bypassable via Safe Mode | **Real-time auto-collapse of Quick Settings tile menu** |
+| **Duration Policy** | Unlimited (promotes fake 8-hour sessions) | Static or arbitrary | **Strict 90-minute cap (based on human ultradian rhythms)** |
+| **Offline Privacy** | Telemetry, cloud accounts, monthly fees | Proprietary server sync | **100% BYOK (Bring Your Own Key), Zero central servers** |
+| **Knowledge Auto-Harvesting** | None | None | **Auto-merges & declutters AI research into your study notes** |
+
+---
+
+## 🛑 What We Obliterate vs ⚡ What We Empower
+
+### 🛑 The Distraction Pit (Strictly Blocked)
+Algorithmically engineered dopamine traps that hijack human psychology and steal hours of student life:
 
 * 📱 **Short-Form Doomscrolling**: TikTok, Instagram Reels, YouTube Shorts, X/Twitter, Reddit, Facebook, Threads, CapCut.
 * 🍿 **Streaming & Piracy Black Holes**: Bilibili, KissKH (`id.kisskh.twa`), Netflix, Disney+, WeTV, iQIYI, Crunchyroll, Loklok, CloudStream, Mihon, and micro-drama reels (ReelShort, DramaBox, ShortMax).
@@ -60,13 +118,14 @@ Algorithmically engineered dopamine traps that hijack human psychology and steal
 
 ---
 
-### ⚡ What We Empower ("ALWAYS" Allowed Arsenal)
-During lockdown, students need tools to learn, calculate, write, and submit assignments. These tools are **hardcoded as always allowed** and given priority placement in the app drawer:
+### ⚡ The "ALWAYS" Allowed Arsenal (Hardcoded Whitelisted)
+Tools that foster deep focus, active learning, coding, note-taking, and assignment submission:
 
-| Category | Permitted Tools | Why It's Hardcoded Allowed |
+| Category | Permitted Applications | Academic Rationale |
 |---|---|---|
 | 🤖 **AI Study Assistants** | **Google Gemini, ChatGPT, Claude, Microsoft Copilot, Perplexity, DeepSeek, Poe, Pi AI** | **Why AI?** AI is the ultimate 24/7 personal tutor. If an AI helps you grasp complex physics, explain calculus, draft an outline, or debug code so you finish your homework on time, **that is a win**. The goal is conquering procrastination, not denying modern intelligence. |
 | 📄 **Document Scanners & PDF Worksheets** | **Adobe Acrobat Reader, CamScanner, Adobe Scan, WPS Office, Microsoft Lens, ReadEra, Xodo PDF** | Essential for viewing homework sheets, reading textbooks, and scanning handwritten pages for submission. |
+| 📂 **System Document & Media Pickers** | **AOSP & Google DocumentsUI (`com.google.android.documentsui`), Media Providers, Samsung My Files, Files by Google** | Seamless, invisible file browsing during homework photo uploads without false-positive lockouts. |
 | 🌐 **Translation & Language Learning** | **Google Translate, DeepL Translate, Duolingo, Merriam-Webster, Oxford & Cambridge Dictionaries** | Seamless translation of source materials and foreign language homework. |
 | 📝 **All Notes Apps** | **Google Keep, Samsung Notes, Microsoft OneNote, Notion, Obsidian, Evernote, ColorNote, Squid, Simplenote** | Students must always be able to jot ideas, review lecture outlines, and brainstorm without obstacles. |
 | 🎓 **Student Platforms & Storage** | **Google Classroom, Drive, Docs, Sheets, Slides, Canvas Student, Blackboard Learn, Schoology, Quizlet, AnkiDroid** | Your textbooks, problem sets, syllabi, and submission portals must never be blocked. |
@@ -78,9 +137,131 @@ During lockdown, students need tools to learn, calculate, write, and submit assi
 
 ---
 
+## 🏗️ System Architecture
+
+### 1. Multi-Layer Component Flow
+
+```mermaid
+flowchart TD
+    subgraph NativeOS ["Android 10 - 16 Native Operating System Layer"]
+        LAS["LockAccessibilityService<br/>• Window Event Interceptor<br/>• Quick Settings Collapser<br/>• Package Heuristic Engine"]
+        FOS["FloatingOverlayService<br/>• WindowManager Overlay Ball<br/>• Smooth Physics Edge-Snap<br/>• Special-Use Foreground Daemon"]
+        AM["AlarmManager & BootReceiver<br/>• Exact RTC Wall-Clock Alarms<br/>• Reboot Auto-Recovery"]
+        DPM["DevicePolicyManager<br/>• Device Administrator Admin<br/>• Anti-Uninstall Enforcement"]
+    end
+
+    subgraph Bridge ["Capacitor 7 Native Two-Way IPC Bridge"]
+        LP["LockPlugin.java<br/>• Two-Way Native IPC<br/>• SharedPreferences Sync<br/>• Overlay & Service Controller"]
+    end
+
+    subgraph WebApp ["React 19 + TypeScript Application Core"]
+        DASH["Dashboard & Schedule Hub<br/>• Live Countdown Cards<br/>• Clickable Read-Only Homework Modal"]
+        CREATE["Step-by-Step Schedule Creator<br/>• OCR Extraction & Inline Editor<br/>• Strict 90-Min Ultradian Cap"]
+        LOCK["Full-Screen LockScreen View<br/>• Native Camera Document Capture<br/>• Real-Time Timer Synchronization"]
+        LOGS["Homeworks Log & Session Archive<br/>• Passed Grading Transcripts<br/>• Failed / Expired Accountability Logs"]
+        RES["Study Resource Library<br/>• Markdown & Docx Local Ingestion<br/>• Auto-Harvesting & declutterResource"]
+    end
+
+    subgraph CloudServices ["Client-Side BYOK Cloud Services (Direct HTTPS)"]
+        GEMINI["Google Gemini 2.0 / 2.5 API<br/>• Multimodal Handwritten Analysis<br/>• Dynamic Rubric Generator<br/>• Resource Decluttering Engine"]
+        OCR["OCR.space REST API<br/>• Handwritten Mode Transcription<br/>• Document Optical Character Recognition"]
+    end
+
+    LAS -->|Blocks Hostile Apps & Settings| LAS
+    LAS -->|Dispatches Lock Intent| LOCK
+    AM -->|Triggers Exact Start / End| FOS
+    AM -->|Auto-Relaunch on Alarm| LOCK
+    DPM -->|Blocks App Uninstall in Settings| LAS
+
+    LP <-->|Synchronizes Whitelist & Active Schedule| LAS
+    LP <-->|Starts / Stops Floating Ball View| FOS
+    WebApp <-->|Capacitor JavaScript Bridge| LP
+
+    LOCK -->|Dispatches Photo Proof| OCR
+    OCR -->|Returns Raw Transcribed Text| GEMINI
+    GEMINI -->|Returns JSON Score & Feedback| LOCK
+    LOCK -->|Passed: Harvests AI Research| RES
+    LOCK -->|Timeout: Logs Failed Record| LOGS
+    RES -->|Declutters via Gemini| RES
+```
+
+---
+
+### 2. Lockdown Lifecycle State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: App Installed & Permissions Granted
+    Idle --> Scheduled: User Creates Schedule (Max 90 Mins)
+    Idle --> ActiveLockdown: User Taps "Start Lockdown Now"
+    Scheduled --> ActiveLockdown: Wall-Clock Alarm Triggers (AlarmManager)
+    
+    state ActiveLockdown {
+        [*] --> InitializeLock
+        InitializeLock --> SpawnOverlay: Start FloatingOverlayService
+        InitializeLock --> EngageAccessibility: Set lockdown_active = true
+        
+        state PermittedAppWorkflow {
+            AllowedAppOpened --> FloatingBallVisible: Draggable & Snaps to Edge
+            FloatingBallVisible --> AllowedAppOpened: Research in Gemini/Docs/Notes
+            FloatingBallVisible --> ReturnToQiezka: Tap Ball to Submit Proof
+        }
+        
+        state BlockedAppWorkflow {
+            HostileAppOpened --> DetectPackage: Accessibility Event Fired
+            DetectPackage --> CollapseQuickSettings: If Notification Shade Pulled
+            DetectPackage --> RouteHome: If Hostile App or Settings
+            RouteHome --> ForceQiezkaFront: Re-open Qiezka Lock Screen
+        }
+        
+        ReturnToQiezka --> CaptureHomework: Camera Photo Proof
+        CaptureHomework --> CloudEvaluation: OCR.space + Gemini Evaluation
+    }
+    
+    CloudEvaluation --> PassUnlocked: AI Score >= Passing Threshold
+    CloudEvaluation --> ActiveLockdown: AI Score < Passing Threshold (Try Again)
+    ActiveLockdown --> FailExpired: Timer Reaches 00:00 (Timeout)
+    
+    PassUnlocked --> HomeworksLog: Log Passed Record + Auto-Harvest Knowledge
+    FailExpired --> HomeworksLog: Log Failed / Expired Accountability Record
+    
+    HomeworksLog --> Idle: Floating Ball Removed & System Unlocked
+```
+
+---
+
+## 🔮 Floating Assistive Timer Ball
+
+When a lockdown session is initiated, QIEZKA summons an elegant **Floating Assistive Ball Timer** that stays with you across all permitted apps:
+
+```
+          ┌────────────────────────────────────────────────────────┐
+          │  Allowed Application (Google Docs / Keep / Gemini)     │
+          │                                                        │
+          │                                                        │
+          │                   ┌──────────────┐                     │
+          │                   │  ⏱️ 24:18    │ ◀─── Assistive Ball │
+          │                   └──────────────┘                     │
+          │                                                        │
+          │  • Floats above all permitted applications             │
+          │  • Drag anywhere & smoothly snaps to nearest edge      │
+          │  • Real-time countdown synced with native bridge       │
+          │  • Single tap instantly returns to QIEZKA submission   │
+          └────────────────────────────────────────────────────────┘
+```
+
+### Engineering Specifications of the Floating Ball
+* **System-Wide Overlay**: Rendered via native Android `WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY` with `FLAG_NOT_FOCUSABLE`. It never steals keyboard focus when you are typing essays in Google Docs or prompts in Gemini.
+* **Physics-Based Edge Snapping**: You can drag the ball anywhere across the screen. On touch release (`ACTION_UP`), the service calculates the screen width and uses a smooth `ValueAnimator` with cubic deceleration to glide and snap the ball against the nearest left or right border.
+* **Flicker-Free Debounce**: Digits are updated using a dedicated equality check (`if (!newText.equals(tvTimer.getText().toString()))`) before calling `setText()`. Rapid window switches or app taps never cause digit flashing or erratic frame stutter.
+* **Foreground Service Persistence**: Supported by Android's `FOREGROUND_SERVICE_TYPE_SPECIAL_USE` daemon. Even under aggressive OEM memory pressure on Android 14, 15, and 16, the system will not kill the overlay timer.
+* **One-Tap Quick Return**: Tapping the floating ball automatically fires a high-priority `Intent` with `FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_REORDER_TO_FRONT` to summon QIEZKA's homework submission screen in milliseconds.
+
+---
+
 ## 📋 Complete Application Reference (Blocked & Allowed)
 
-QIEZKA enforces focus using a two-layer defense: **Exact Package ID Matching** and **Dynamic Substring / Signature Heuristics**. Below is the complete catalog of all hardcoded applications recognized by both the TypeScript UI and native Android Accessibility engine (`BlacklistConstants.java`, `LockAccessibilityService.java`, and `LockPlugin.java`).
+QIEZKA utilizes dual-layer enforcement: **Exact Package ID Matching** and **Dynamic Substring / Signature Heuristics**. Below is the complete catalog of all hardcoded applications recognized by the frontend UI and the native Android Accessibility engine ([`blacklistedApps.ts`](file:///c:/Users/CxAdmin/Desktop/qiezka/uncode/src/constants/blacklistedApps.ts), [`BlacklistConstants.java`](file:///c:/Users/CxAdmin/Desktop/qiezka/uncode/android/app/src/main/java/com/uncode/app/BlacklistConstants.java), and [`LockPlugin.java`](file:///c:/Users/CxAdmin/Desktop/qiezka/uncode/android/app/src/main/java/com/uncode/app/LockPlugin.java)).
 
 ---
 
@@ -89,23 +270,48 @@ QIEZKA enforces focus using a two-layer defense: **Exact Package ID Matching** a
 These applications are permanently whitelisted during lockdown. They appear in the app drawer and are never routed Home or blocked.
 
 <details open>
-<summary><b>🤖 1. AI Study Assistants (8 Packages)</b></summary>
+<summary><b>🤖 1. AI Study Assistants (11 Packages)</b></summary>
 
 | Application | Android Package ID | Academic Role |
 |---|---|---|
 | **Google Gemini** | `com.google.android.apps.bard` | Native Google multimodal AI assistant |
+| **Google Gemini (Direct)** | `com.google.android.apps.gemini` | Standalone Google Gemini package |
+| **Google Assistant / Gemini** | `com.google.android.apps.googleassistant` | Android voice & assistant trigger |
 | **ChatGPT** | `com.openai.chatgpt` | OpenAI homework & concept tutor |
 | **Claude** | `com.anthropic.claude` | Anthropic reasoning & writing tutor |
 | **Microsoft Copilot** | `com.microsoft.copilot` | Microsoft GPT-4 & Bing search assistant |
 | **Perplexity AI** | `ai.perplexity.app.android` | Citation-backed research engine |
 | **DeepSeek** | `com.deepseek.chat` | DeepSeek AI assistant & math reasoning |
-| **Poe** | `com.poe.android` | Multi-bot AI ecosystem by Quora |
+| **Poe by Quora** | `com.poe.android`, `com.quora.poe.android` | Multi-bot AI ecosystem by Quora |
 | **Pi AI** | `ai.inflection.pi` | Conversational study coach |
 
 </details>
 
 <details open>
-<summary><b>📄 2. Document Scanners & PDF Worksheets (8 Packages)</b></summary>
+<summary><b>📂 2. System Document Pickers & Media Providers (Hidden Exemptions - 13 Packages)</b></summary>
+
+*These packages are internal OS file providers. They are hardcoded as completely exempt so homework photo uploads and document attachments never get blocked, but are hidden from the user-facing Allowed Apps UI:*
+
+| Component / Provider | Package ID | Role |
+|---|---|---|
+| **Google DocumentsUI** | `com.google.android.documentsui` | Stock Android file and storage picker |
+| **AOSP DocumentsUI** | `com.android.documentsui` | Core Android system document provider |
+| **Google Media Provider** | `com.google.android.providers.media.module` | Internal Android photo picker provider |
+| **AOSP Media Provider** | `com.android.providers.media` | System media indexing & SAF provider |
+| **Samsung My Files** | `com.sec.android.app.myfiles` | Samsung OneUI file manager |
+| **Files by Google** | `com.google.android.apps.nbu.files` | Google official file explorer |
+| **Xiaomi File Explorer** | `com.mi.android.globalFileexplorer` | MIUI / HyperOS file selector |
+| **Oppo File Manager** | `com.coloros.filemanager` | ColorOS file manager |
+| **OnePlus File Manager** | `com.oneplus.filemanager` | OxygenOS file selector |
+| **Huawei Files** | `com.huawei.filemanager` | EMUI / HarmonyOS file browser |
+| **Vivo File Manager** | `com.vivo.FileManager` | FuntouchOS file selector |
+| **Motorola Files** | `com.motorola.filemanager` | Moto file manager |
+| **Asus File Manager** | `com.asus.filemanager` | ZenUI storage browser |
+
+</details>
+
+<details open>
+<summary><b>📄 3. Document Scanners & PDF Worksheets (8 Packages)</b></summary>
 
 | Application | Android Package ID | Academic Role |
 |---|---|---|
@@ -121,7 +327,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details open>
-<summary><b>🌐 3. Translation & Language Dictionaries (6 Packages)</b></summary>
+<summary><b>🌐 4. Translation & Language Dictionaries (6 Packages)</b></summary>
 
 | Application | Android Package ID | Academic Role |
 |---|---|---|
@@ -135,7 +341,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details open>
-<summary><b>📝 4. Note-Taking & Brainstorming (15 Packages)</b></summary>
+<summary><b>📝 5. Note-Taking & Brainstorming (15 Packages)</b></summary>
 
 | Application | Android Package ID | Academic Role |
 |---|---|---|
@@ -158,7 +364,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details open>
-<summary><b>🎓 5. Student Platforms, LMS & Office Suites (20 Packages)</b></summary>
+<summary><b>🎓 6. Student Platforms, LMS & Office Suites (21 Packages)</b></summary>
 
 | Application | Android Package ID | Academic Role |
 |---|---|---|
@@ -187,7 +393,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details open>
-<summary><b>🧮 6. STEM Solvers & Learning Hubs (7 Packages)</b></summary>
+<summary><b>🧮 7. STEM Solvers & Learning Hubs (7 Packages)</b></summary>
 
 | Application | Android Package ID | Academic Role |
 |---|---|---|
@@ -202,7 +408,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details open>
-<summary><b>☁️ 7. Cloud Storage & Sync (3 Packages)</b></summary>
+<summary><b>☁️ 8. Cloud Storage & Sync (3 Packages)</b></summary>
 
 | Application | Android Package ID | Academic Role |
 |---|---|---|
@@ -213,7 +419,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details open>
-<summary><b>💻 8. CS & Coding Environments (4 Packages)</b></summary>
+<summary><b>💻 9. CS & Coding Environments (4 Packages)</b></summary>
 
 | Application | Android Package ID | Academic Role |
 |---|---|---|
@@ -225,7 +431,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details open>
-<summary><b>🛡️ 9. 2FA Authenticators (10 Packages)</b></summary>
+<summary><b>🛡️ 10. 2FA Authenticators (10 Packages)</b></summary>
 
 | Application | Android Package ID | Security Role |
 |---|---|---|
@@ -243,7 +449,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details open>
-<summary><b>🌐 10. Web Browsers (9 Packages)</b></summary>
+<summary><b>🌐 11. Web Browsers (8 Packages)</b></summary>
 
 | Application | Android Package ID | Function |
 |---|---|---|
@@ -259,7 +465,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details open>
-<summary><b>🎵 11. Deep Focus Music & Audio (9 Packages)</b></summary>
+<summary><b>🎵 12. Deep Focus Music & Audio (9 Packages)</b></summary>
 
 | Application | Android Package ID | Function |
 |---|---|---|
@@ -276,9 +482,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details open>
-<summary><b>📸 12. System Camera Applications (13 Packages)</b></summary>
-
-*Camera apps are permitted so students can photograph physical paper homework for AI evaluation without getting kicked to Home.*
+<summary><b>📸 13. System Camera Applications (12 Packages)</b></summary>
 
 | Vendor / ROM | Android Package ID |
 |---|---|
@@ -296,9 +500,10 @@ These applications are permanently whitelisted during lockdown. They appear in t
 </details>
 
 <details>
-<summary><b>⚙️ 13. System Keyboards & IMEs (Under-the-Hood Exemptions - 18 Packages)</b></summary>
+<summary><b>⚙️ 14. System Keyboards & IMEs (Under-the-Hood Exemptions - 18 Packages)</b></summary>
 
 *These packages are native input-method infrastructure. They are automatically permitted so students can type in search boxes and notes, but are hidden from the UI app drawer:*
+
 `com.google.android.inputmethod.latin` (Gboard), `com.samsung.android.honeyboard` (Samsung Keyboard), `com.touchtype.swiftkey` & `com.touchtype.swiftkey.beta` (SwiftKey), `com.android.inputmethod.latin` (AOSP), `com.syntellia.fleksy.keyboard` (Fleksy), `org.dslul.openboard.inputmethod.latin` (OpenBoard), `com.menny.android.anysoftkeyboard` (AnySoftKeyboard), `com.grammarly.android.keyboard` (Grammarly), `com.oppo.keyboard`, `com.coloros.keyboard`, `com.vivo.keyboard`, `com.huawei.ohos.inputmethod`, `com.sohu.inputmethod.sogou`, `com.baidu.input`, `com.google.android.tts`.
 
 </details>
@@ -307,7 +512,7 @@ These applications are permanently whitelisted during lockdown. They appear in t
 
 ### 🔴 Hardcoded Blacklisted Applications (Strictly Blocked)
 
-These applications represent high-dopamine distractions, bypass vectors, or cracking utilities. Any attempt to open them immediately triggers the native accessibility service to fire an `ACTION_HOME` intent and collapse the interface within milliseconds.
+These applications represent high-dopamine distractions, bypass vectors, or cracking utilities. Any attempt to open them immediately triggers the native accessibility service to route the user Home in milliseconds.
 
 <details open>
 <summary><b>🍿 1. Asian Dramas, Anime & Streaming (26 Packages)</b></summary>
@@ -382,7 +587,7 @@ These applications represent high-dopamine distractions, bypass vectors, or crac
 </details>
 
 <details open>
-<summary><b>📺 5. Global Video Streaming & OTT (26 Packages)</b></summary>
+<summary><b>📺 5. Global Video Streaming & OTT (20 Packages)</b></summary>
 
 | Application | Android Package ID |
 |---|---|
@@ -423,8 +628,6 @@ These applications represent high-dopamine distractions, bypass vectors, or crac
 
 <details open>
 <summary><b>📦 7. Virtual OS, Containers & Sandbox Bypass Tools (13 Packages)</b></summary>
-
-*These utilities create virtualized parallel Android environments with isolated roots, which can be abused to run unmonitored apps outside of QIEZKA's accessibility scope.*
 
 | Application | Android Package ID | Bypass Mechanism |
 |---|---|---|
@@ -482,7 +685,7 @@ These applications represent high-dopamine distractions, bypass vectors, or crac
 </details>
 
 <details open>
-<summary><b>📱 10. Social Media & Short-Form Video (38 Packages)</b></summary>
+<summary><b>📱 10. Social Media & Short-Form Video (35 Packages)</b></summary>
 
 | Application | Android Package ID |
 |---|---|
@@ -642,7 +845,7 @@ These applications represent high-dopamine distractions, bypass vectors, or crac
 | **Crossy Road** | `com.yodo1.crossyroad` | Endless road crossing arcade |
 | **Fruit Ninja** | `com.halfbrick.fruitninjafree` | Halfbrick blade slashing reflex arcade |
 | **Cut the Rope** | `com.zeptolab.ctr.ads` | ZeptoLab physics puzzle |
-| **Blockudoku** | `com.easybrain.block.puzzle.game` | Easybrain addictive block puzzle |
+| **Blockudoku** | `com.easybrain.block.puzzle.game` | Easybrain spatial grid time sink |
 | **2048** | `com.androbaby.game2048` | Sliding tile math puzzle |
 | **Stack / Knife Hit / Rider** | `com.ketchapp.stack`, `com.ketchapp.knifehit`, `com.ketchapp.rider` | Ketchapp minimalist reflex games |
 | **Sand Balls** | `com.mhappsgaming.sandballs` | SayGames sand digging physics puzzle |
@@ -659,24 +862,47 @@ These applications represent high-dopamine distractions, bypass vectors, or crac
 
 ### 🛡️ Dynamic Substring & Heuristic Defense
 
-In addition to exact package ID matching, QIEZKA runs real-time **substring signature evaluation** on every foreground window change in [`blacklistedApps.ts`](file:///c:/Users/CxAdmin/Desktop/qiezka/uncode/src/constants/blacklistedApps.ts) and [`BlacklistConstants.java`](file:///c:/Users/CxAdmin/Desktop/qiezka/uncode/android/app/src/main/java/com/uncode/app/BlacklistConstants.java).
+In addition to exact package ID matching, QIEZKA runs real-time **substring signature evaluation** on every foreground window change event in [`blacklistedApps.ts`](file:///c:/Users/CxAdmin/Desktop/qiezka/uncode/src/constants/blacklistedApps.ts) and [`BlacklistConstants.java`](file:///c:/Users/CxAdmin/Desktop/qiezka/uncode/android/app/src/main/java/com/uncode/app/BlacklistConstants.java).
 
-Any application whose package identifier contains any of the following substrings is **automatically recognized as hostile and blocked**, neutralizing rebranded clones, third-party APK forks, and modded sideloads:
+Any application whose package identifier contains any of the following substrings is **automatically recognized as hostile and blocked**, instantly neutralizing rebranded clones, third-party APK forks, and modded sideloads:
 
-`kisskh` • `bilibili` • `danmaku.bili` • `chelpus` • `luckypatcher` • `instaprime` • `instander` • `aeroinsta` • `honista` • `gameguardian` • `happymod` • `acmarket` • `dramabox` • `reelshort` • `shortmax` • `goodshort` • `moboreels` • `loklok` • `cloudstream` • `movieboxpro` • `anilab` • `stremio` • `onstream` • `revanced` • `gbwhatsapp` • `fmwhatsapp` • `yowhatsapp` • `vmos` • `f1vm` • `vphonegaga` • `x8zs` • `wattpad` • `webnovel` • `wuxiaworld` • `ometv` • `bigo` • `tinder` • `bumble` • `pokerstars` • `bet365` • `draftkings` • `fanduel` • `carousell` • `vinted` • `depop` • `holeio` • `woodturning` • `paperio` • `helixjump` • `crowdcity` • `aquapark` • `slither` • `agar.io` • `snake.io` • `survivorio` • `bridgerace` • `stumbleguys` • `voodoo` • `saygames` • `lionstudios` • `crazylabs` • `ketchapp`
+```
+kisskh • bilibili • danmaku.bili • chelpus • luckypatcher • instaprime • instander • aeroinsta • honista • gameguardian • happymod • acmarket • dramabox • reelshort • shortmax • goodshort • moboreels • loklok • cloudstream • movieboxpro • anilab • stremio • onstream • revanced • gbwhatsapp • fmwhatsapp • yowhatsapp • vmos • f1vm • vphonegaga • x8zs • wattpad • webnovel • wuxiaworld • ometv • bigo • tinder • bumble • pokerstars • bet365 • draftkings • fanduel • carousell • vinted • depop • holeio • woodturning • paperio • helixjump • crowdcity • aquapark • slither • agar.io • snake.io • survivorio • bridgerace • stumbleguys • voodoo • saygames • lionstudios • crazylabs • ketchapp
+```
 
 ---
 
-## 📖 Overview
+## 📖 Feature Deep Dive
 
-**QIEZKA** is an uncompromising productivity and study-enforcement tool built for Android. Unlike generic timer apps that can be bypassed in two clicks, and unlike rigid enterprise kiosk lockdowns that break phone essentials, QIEZKA strikes a surgical balance using a **selective app-filtering architecture with native self-protection**:
+### 1. Step-by-Step Schedule Creator with Editable OCR (Step 2)
+Creating a schedule is intuitive and friction-free:
+1. **Step 1: Select Attached Resources**: Choose from your local library or toggle 🌐 **General AI Knowledge**.
+2. **Step 2: Homework Content & Requirements**: Upload an image, `.docx`, or text file to extract instructions via OCR. **The text is fully interactive and editable in a dedicated editor**, allowing students to fix typos, add notes, or write custom problem sets from scratch.
+3. **Step 3: Define Grading Rubric**: Generate a criteria rubric using Google Gemini AI or write custom instructions.
+4. **Step 4: Timing & Duration (Max 90 Minutes)**: Set activation time (between 7:00 PM and 3:00 AM) and duration. **Duration is strictly capped at 90 minutes** to enforce scientifically optimal deep work cycles (ultradian rhythms) and prevent burnout.
 
-- 📱 **Normal Phone Capabilities Preserved**: Navigation buttons (Home, Back, Recents) continue to work normally. You are not trapped in a broken full-screen jail.
-- 🚫 **Instant Distraction Redirection**: Any attempt to open a non-whitelisted app or system settings immediately sends the user back to the Home screen in milliseconds.
-- ⚡ **Quick Settings Tile Collapse**: The notification shade remains accessible for reading urgent messages, but the Quick Settings tile expansion is collapsed in real time to prevent toggling Wi-Fi, Airplane mode, or system toggles.
-- 🌐 **Online AI-Verified Early Unlock (BYOK)**: No "give up" button or soft timers. The only way to unlock early is to write your homework or notes on physical paper, photograph it, and have **Google Gemini AI** evaluate your handwriting against your study rubric in real time using your own API key.
-- 📴 **Offline Resource & Lockdown Capability**: All study resources, document ingestion (`.docx`, `.txt`, `.md`), notes management, timers, and Android native app blocking work **100% offline** without any internet connection.
-- 📸 **Camera & File Picker Exemptions**: When taking photos or selecting documents for AI homework grading, QIEZKA's native accessibility engine intelligently recognizes system camera intents and file pickers, preventing false-positive lockouts.
+---
+
+### 2. Active Schedules: Clickable Read-Only Homework Viewer
+On the main Dashboard, active schedule cards feature a clickable **Homework Content** section:
+- Provides a neat 3-line preview with an interactive **"View Full"** action.
+- Tapping it summons an instant, distraction-free modal viewer displaying the complete homework prompt in full-fidelity read-only text.
+
+---
+
+### 3. Homeworks Log & Timeout Failure Tracking
+All study activity is permanently tracked under the **Homeworks Log** (accessible via the file icon in the dashboard header):
+- **Passed Sessions**: Displays green verification badges, OCR transcriptions, and AI feedback.
+- **Failed / Expired Sessions**: If a timer expires before homework is submitted and passed, QIEZKA logs the attempt with a red `Failed / Expired` badge and timestamp to keep students accountable.
+- Includes a 1-click **Clear All** action when desired.
+
+---
+
+### 4. AI General Knowledge Auto-Harvesting with `declutterResource`
+When a student completes a homework session where 🌐 **General AI Knowledge** was enabled alongside a notebook resource:
+- The AI answer and research are merged with the existing resource.
+- The combined text is automatically processed by `declutterResource` using Google Gemini in the background.
+- Redundant greetings, conversational filler, and markdown fluff are stripped away, leaving a clean, highly structured reference document in your offline resource library.
 
 ---
 
@@ -693,15 +919,15 @@ QIEZKA is designed as a **hybrid online/offline system** with a strict **Bring Y
 Requires Internet + Personal API Key                            Works 100% Without Internet
  • Handwritten Homework AI Evaluation (Gemini)                   • Study Resource Library & Notes Editor
  • Real-time Photo OCR Transcription (OCR.space)                 • Local Document Parsing (.docx, .txt, .md)
- • AI Prompt Refinement & Dynamic Rubrics                        • Focus Session Timers & Countdown
+ • AI Prompt Refinement & Dynamic Rubrics                        • Focus Session Timers & Floating Ball
  • Cloud Model Selection (Gemini 2.5/2.0/Flash/Pro)              • Selective App Blocking (Accessibility)
-                                                                 • Quick Settings Shield & Recents Guard
+ • Automatic Knowledge Harvesting & Decluttering                 • Quick Settings Shield & Recents Guard
                                                                  • Device Admin Anti-Uninstall Protection
                                                                  • Full JSON Data Backup & Restore
 ```
 
 ### 1. What Works Offline (Resources & Lockdown Only)
-- **Local Study Resources**: You can create, edit, search, organize, and review all your notes, syllabi, and study materials with zero internet connection.
+- **Local Study Resources**: Create, edit, search, organize, and review all notes, syllabi, and study materials with zero internet connection.
 - **Client-Side Document Parsing**: Ingestion of `.txt`, `.md`, and Microsoft Word `.docx` documents is processed directly inside your browser/WebView using local in-memory engines ([Mammoth](https://github.com/mwilliamson/mammoth.js)).
 - **Focus Enforcement & Lockdown Engine**: Android Accessibility service app-blocking, Quick Settings tile collapse, Device Administrator uninstall prevention, and boot recovery operate strictly on-device via native Android OS APIs.
 - **Data Backups**: Export and import complete JSON backups of your settings, resources, and schedules offline.
@@ -730,22 +956,6 @@ QIEZKA takes 1 minute to configure with free keys:
 1. Visit [OCR.space Free API Registration](https://ocr.space/ocrapi/freekey).
 2. Enter your email and name; your free API key will be delivered instantly.
 3. In QIEZKA, paste it into **Simple OCR API Key** or **Formatted OCR API Key** under Settings and tap **Save**.
-
----
-
-## ✨ Key Features
-
-| Feature | Details | Network Requirement |
-|---|---|:---:|
-| 🎯 **Selective App Filtering** | Whitelist required tools (Calculator, Notes, Dictionary, Music, PDF Reader). All non-approved apps are immediately suppressed and routed to Home via Android Accessibility. | 📴 **Offline** |
-| 🛡️ **Quick Settings Defense** | Allows the notification shade for reading text alerts while collapsing Quick Settings tiles to prevent bypass via status toggles. | 📴 **Offline** |
-| 🔄 **Anti-Cheat Boot Persistence** | Restarting the phone will not break the lockdown session—`BootReceiver` detects active timers and immediately re-engages QIEZKA upon system boot. | 📴 **Offline** |
-| 🔒 **Uninstall Protection** | Activated as a standard **Device Administrator**. Android blocks uninstallation until administrator privileges are revoked; because QIEZKA blocks Android Settings during lockdown, deactivation is impossible. | 📴 **Offline** |
-| 📚 **Resource Library** | Create, view, edit, and organize lecture notes, study outlines, syllabi, and local `.docx`/`.txt` files client-side. | 📴 **Offline** |
-| 🤖 **AI Homework Evaluation** | Built-in OCR pipeline connected with Google Gemini models (Gemini 2.5, Gemini 2.0, Gemini 1.5) that inspects work quality against a custom rubric before allowing an unlock. | 🌐 **Online (BYOK)** |
-| 📑 **Dual Submission Flow** | Choose between capturing physical handwritten pages with your live camera (`capture="environment"`) or selecting files/photos from your device gallery. | 🌐 **Online (BYOK)** |
-| 🔋 **Doze & Battery Saver Immunity** | Whitelists QIEZKA from aggressive Android Doze and OEM power managers (Samsung OneUI, Xiaomi MIUI/HyperOS, Pixel) to prevent timers from being killed. | 📴 **Offline** |
-| 🛠️ **Dual Setup Pathways** | Complete configuration 100% on-device via guided interactive prompts, or automate the entire setup in seconds with `qiezka.bat` over USB debugging. | 📴 **Offline** |
 
 ---
 
@@ -786,8 +996,8 @@ Ideal for everyday use. Complete all 4 steps inside the in-app **Permission Walk
 5. **Tap "Proceed to Dashboard"** to finish setup!
 
 > [!TIP]
-> #### Android 13/14+ "Restricted setting" Bypass Guide
-> Android 13 and 14+ automatically mark sideloaded apps with a *"Restricted setting"* warning for Accessibility and Device Admin. You can unlock it in 10 seconds:
+> #### Android 13/14/15/16 "Restricted setting" Bypass Guide
+> Modern Android automatically marks sideloaded apps with a *"Restricted setting"* warning for Accessibility and Device Admin. You can unlock it in 10 seconds:
 > 1. In the QIEZKA walkthrough, tap **Step 1** or **Step 2** once (this triggers Android to register the restriction attempt).
 > 2. Tap the **Open App Info** button inside the walkthrough banner.
 > 3. In the top-right corner of QIEZKA's App Info page, tap the **3 dots (⋮)** menu.
@@ -810,7 +1020,7 @@ Ideal for power users, developers, or anyone with a PC who wants an instant, 1-c
 
 ## ⚙️ Customizing `qiezka.bat`
 
-[`qiezka.bat`](file:///c:/Users/CxAdmin/Desktop/qiezka/uncode/qiezka.bat) includes a **User Configuration Section** at the very top. You can open `qiezka.bat` in any text editor (Notepad, VS Code) to customize every function using simple `true` or `false` flags:
+[`qiezka.bat`](file:///c:/Users/CxAdmin/Desktop/qiezka/uncode/qiezka.bat) includes a **User Configuration Section** at the very top. You can open `qiezka.bat` in any text editor to customize every function using simple `true` or `false` flags:
 
 ```bat
 :: ============================================================================
@@ -834,31 +1044,14 @@ set "WHITELIST_BATTERY=true"
 set "ENABLE_ACCESSIBILITY=true"
 
 :: 6. Activate Device Administrator to prevent uninstallation during lockdown
-::    (100% realistic: works with all personal Google accounts logged in, no wipe needed)
 set "ACTIVATE_DEVICE_ADMIN=true"
 
 :: 7. Attempt Enterprise Device Owner mode (DEFAULT: false)
-::    (Unrealistic for everyday devices: requires root or removing all Google accounts)
 set "TRY_DEVICE_OWNER=false"
 
 :: 8. Automatically launch QIEZKA on your phone after setup completes
 set "LAUNCH_APP_ON_FINISH=true"
 ```
-
----
-
-### Function Reference & Options Guide
-
-| Function | Default | Value | What It Does & When To Use It |
-|---|:---:|:---:|---|
-| **`FORCE_REINSTALL_APK`** | `false` | `false`<br>`true` | **`false` (Recommended)**: The script checks `pm path com.uncode.app`. If QIEZKA is already installed on your device, it skips the install step and jumps straight to provisioning permissions.<br>**`true`**: Forces an `adb install -r` of the local APK file, overwriting the app on your phone even if already present. Use this when you built a new debug APK and want to push the latest code. |
-| **`BYPASS_RESTRICTED_SETTINGS`** | `true` | `true`<br>`false` | **`true` (Recommended)**: Runs `appops set com.uncode.app ACCESS_RESTRICTED_SETTINGS allow`. Bypasses Android 13/14's sideload restrictions instantly without needing to enter App Info or tap the 3-dot menu manually.<br>**`false`**: Skips the ADB appops call (requires manual permission granting on device). |
-| **`GRANT_SECURE_PERMISSIONS`** | `true` | `true`<br>`false` | **`true` (Recommended)**: Pre-grants `WRITE_SECURE_SETTINGS`, `DUMP`, and `POST_NOTIFICATIONS`. Enables seamless background system control without in-app dialog popups.<br>**`false`**: Skips secure permission granting. |
-| **`WHITELIST_BATTERY`** | `true` | `true`<br>`false` | **`true` (Recommended)**: Runs `dumpsys deviceidle whitelist +com.uncode.app`. Whitelists QIEZKA from Android Doze mode and OEM battery task killers (e.g. Samsung Device Care, Xiaomi MIUI Battery Saver).<br>**`false`**: Skips battery whitelisting. |
-| **`ENABLE_ACCESSIBILITY`** | `true` | `true`<br>`false` | **`true` (Recommended)**: Automatically registers and enables `LockAccessibilityService` in Android secure settings. Eliminates having to find QIEZKA under Accessibility menus.<br>**`false`**: Skips enabling Accessibility via ADB. |
-| **`ACTIVATE_DEVICE_ADMIN`** | `true` | `true`<br>`false` | **`true` (Recommended)**: Runs `dpm set-active-admin com.uncode.app/.AdminReceiver`. Makes QIEZKA an active Device Administrator. Android blocks uninstallation while active. Because QIEZKA blocks Settings during lockdown, you cannot uninstall during study sessions. Works on all phones with all accounts logged in.<br>**`false`**: Leaves Device Admin inactive. |
-| **`TRY_DEVICE_OWNER`** | `false` | `false`<br>`true` | **`false` (Recommended)**: Device Owner is an enterprise MDM mode meant for factory-reset corporate devices. If personal Google/WhatsApp accounts exist, Android rejects it. Standard Device Admin + Settings blocking provides full protection without removing accounts.<br>**`true`**: Attempts `dpm set-device-owner`. Only succeeds on fresh/wiped devices with 0 accounts or rooted devices. |
-| **`LAUNCH_APP_ON_FINISH`** | `true` | `true`<br>`false` | **`true` (Recommended)**: Sends an `am start` command to bring QIEZKA to the foreground on your phone screen immediately after script execution.<br>**`false`**: Leaves the phone in its current state without launching the app. |
 
 ---
 
@@ -883,18 +1076,111 @@ set "LAUNCH_APP_ON_FINISH=true"
 ### Why Standard Device Administrator Over Device Owner?
 - **Enterprise Device Owner Limitation**: Android requires that **zero** accounts (Google, WhatsApp, Telegram, etc.) exist on the device before setting a Device Owner (`IllegalStateException: Not allowed to set the device owner because there are already some accounts on the device`). Forcing users to delete their personal accounts or factory reset is impractical.
 - **The QIEZKA Solution**: Standard **Device Administrator** (`DeviceAdminReceiver`):
-  1. Once active, Android strictly prohibits the application from being uninstalled until the user deactivates administrator permissions in Android Settings.
+  1. Once active, Android strictly prohibits the application from being uninstalled until administrator permissions are revoked in Android Settings.
   2. Because QIEZKA's accessibility engine **blocks the Android Settings app** during lockdown, the user cannot access the menu to deactivate Device Admin or uninstall the app.
   3. All personal accounts remain completely intact, and no root or wipe is required.
 
 ---
 
+## 📱 OEM ROM Optimization Guide
+
+Aggressive OEM background managers can prematurely terminate background accessibility monitors. Follow your manufacturer's checklist below:
+
+<details>
+<summary><b>🔵 Samsung (One UI)</b></summary>
+
+1. **Battery Exemption**: Go to *Settings > Apps > QIEZKA > Battery* and choose **Unrestricted**.
+2. **Never Sleeping Apps**: Go to *Settings > Battery > Background usage limits > Never auto-sleeping apps* and tap **+** to add QIEZKA.
+3. **Lock in Recents**: Open the App Switcher (Recents), tap the QIEZKA app icon, and tap **Lock this app**.
+
+</details>
+
+<details>
+<summary><b>🟠 Xiaomi / Redmi / POCO (MIUI / HyperOS)</b></summary>
+
+1. **Autostart**: Go to *Settings > Apps > Manage Apps > QIEZKA* and toggle **Autostart** to **ON**.
+2. **Battery Saver**: In the same menu, tap **Battery Saver** and select **No restrictions**.
+3. **Lock in Task Switcher**: Open Recents, long-press the QIEZKA card, and tap the **Padlock icon**.
+4. **Display Pop-up Windows**: Enable *Display pop-up windows while running in the background*.
+
+</details>
+
+<details>
+<summary><b>🟢 Oppo / Realme / OnePlus (ColorOS / OxygenOS)</b></summary>
+
+1. **Allow Background Activity**: Go to *Settings > Apps > App Management > QIEZKA > Battery Usage* and enable **Allow background activity** and **Allow auto-launch**.
+2. **App Lock**: In Recents, tap the **3 dots** next to QIEZKA and select **Lock**.
+
+</details>
+
+<details>
+<summary><b>🔴 Vivo / iQOO (Funtouch OS / OriginOS)</b></summary>
+
+1. **High Background Power Consumption**: Go to *Settings > Battery > Background power consumption management* and set QIEZKA to **Don't restrict background power use**.
+2. **Autostart**: Go to *Settings > Applications and Permissions > Autostart* and turn QIEZKA **ON**.
+
+</details>
+
+<details>
+<summary><b>⚪ Google Pixel & Stock Android</b></summary>
+
+1. Go to *Settings > Apps > See all apps > QIEZKA > App battery usage*.
+2. Select **Unrestricted**.
+
+</details>
+
+---
+
+## 📂 Codebase Architecture & Tour
+
+```
+qiezka/
+├── android/app/src/main/java/com/uncode/app/
+│   ├── AdminReceiver.java            # DeviceAdminReceiver: intercepts & prevents uninstall attempts
+│   ├── AlarmReceiver.java            # BroadcastReceiver: triggers exact wall-clock schedule alarms
+│   ├── BlacklistConstants.java       # Native blacklist database: package IDs & heuristic regexes
+│   ├── BootReceiver.java             # Auto-resumes active lockdown sessions after device reboot
+│   ├── FloatingOverlayService.java   # Draggable WindowManager floating ball timer with edge-snapping
+│   ├── LockAccessibilityService.java # Core Accessibility engine: window monitoring & app interception
+│   ├── LockPlugin.java               # Capacitor two-way IPC bridge between React and native services
+│   ├── MainActivity.java             # Android activity entry point & Capacitor bridge initializer
+│   └── ScheduleManager.java          # Native schedule persistence & AlarmManager coordinator
+├── src/
+│   ├── api/
+│   │   ├── buildRubric.ts            # AI rubric generation from homework prompts
+│   │   ├── declutterResource.ts      # Gemini pipeline to strip chat fluff & clean study notes
+│   │   ├── evaluate.ts               # Gemini multimodal handwritten homework grading
+│   │   ├── generateAnswer.ts         # Generates reference answers & scoring rubrics
+│   │   ├── parseResource.ts          # Client-side .docx (Mammoth), .txt, and .md document parsing
+│   │   └── validateHomework.ts       # Validates photographed homework against rubric criteria
+│   ├── components/
+│   │   ├── CreateSchedule.tsx        # 4-step schedule creator with editable OCR text & 90-min cap
+│   │   ├── Dashboard.tsx             # Active schedule countdown cards & modal homework viewer
+│   │   ├── EditRubric.tsx            # Interactive grading criteria editor
+│   │   ├── EvaluationResult.tsx      # Visual score breakdown & feedback card
+│   │   ├── HomeworksPage.tsx         # Homeworks Log archive (passed & failed/expired records)
+│   │   ├── LockScreen.tsx            # Full-screen lock enforcement & camera submission
+│   │   ├── Onboarding.tsx            # First-run welcome & mission statement
+│   │   ├── PermissionWalkthrough.tsx # In-app permission setup wizard with direct intent links
+│   │   └── SettingsOverlay.tsx       # BYOK API key configuration & system preferences
+│   ├── constants/
+│   │   ├── allowedApps.ts            # Hardcoded whitelisted apps & hidden system file pickers
+│   │   └── blacklistedApps.ts        # Hardcoded blacklisted apps & signature substring lists
+│   ├── App.tsx                       # Root application coordinator, state management & routing
+│   └── systemBridge.ts               # TypeScript wrapper for native LockPlugin Capacitor calls
+├── qiezka.bat                        # Automated Windows ADB setup, permission grant & launch script
+└── package.json                      # Project metadata, scripts, and dependencies
+```
+
+---
+
 ## 💻 Tech Stack
 
-- **Core & Runtime**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite](https://vitejs.dev/)
+- **Core Framework**: [React 19](https://react.dev/), [TypeScript 5.8](https://www.typescriptlang.org/), [Vite 6](https://vitejs.dev/)
 - **Mobile Native Bridge**: [Capacitor 7](https://capacitorjs.com/) (`@capacitor/android`, `@capacitor/filesystem`)
-- **Native Android Engine**: Java (Accessibility Service, DevicePolicyManager, BroadcastReceiver, ContentResolver SAF)
-- **AI & Evaluation**: [@google/genai](https://www.npmjs.com/package/@google/genai) (Google Gemini 2.5 / 2.0 / 1.5 Flash & Pro) + OCR.space
+- **Native Android Engine**: Java 17 (Accessibility Service, Floating WindowManager Overlay, DevicePolicyManager, BroadcastReceiver, ContentResolver SAF)
+- **AI & Evaluation**: [@google/genai](https://www.npmjs.com/package/@google/genai) (Google Gemini 2.0 / 2.5 Flash & Pro) + OCR.space
+- **Document Ingestion**: [Mammoth.js](https://github.com/mwilliamson/mammoth.js) (Offline `.docx` to HTML/Text conversion)
 - **Styling & UI**: [Tailwind CSS 4](https://tailwindcss.com/), [Motion / Framer Motion](https://motion.dev/), [Lucide React](https://lucide.dev/)
 
 ---
@@ -908,24 +1194,62 @@ set "LAUNCH_APP_ON_FINISH=true"
 
 ### Commands
 ```bash
-# Install dependencies
+# 1. Install dependencies
 npm install
 
-# Run web dev server
+# 2. Run web dev server
 npm run dev
 
-# Build web distribution bundle
+# 3. Build web distribution bundle
 npm run build
 
-# Sync web bundle and native plugins to Android
+# 4. Sync web bundle and native plugins to Android
 npx cap sync android
 
-# Open Android project in Android Studio
+# 5. Open Android project in Android Studio
 npx cap open android
 ```
+
+> [!IMPORTANT]
+> **Compilation Notice**: Always run `npm run build` followed by `npx cap sync android` whenever you modify frontend components in `src/` or bridge definitions to keep the Android assets in sync.
+
+---
+
+## ❓ Frequently Asked Questions (FAQ)
+
+<details>
+<summary><b>1. Why is schedule duration capped at 90 minutes?</b></summary>
+Cognitive science and chronobiology demonstrate that sustained human focus operates on **ultradian rhythms** (natural biological cycles lasting approximately 90 minutes). Setting multi-hour lockdown sessions leads to diminishing cognitive returns, mental exhaustion, and burnout. 90 minutes represents the gold standard for high-intensity, undistracted academic productivity.
+</details>
+
+<details>
+<summary><b>2. What if there is an urgent phone call or family emergency?</b></summary>
+Emergency dialer functions and incoming phone calls (`com.android.phone`, `com.google.android.dialer`, `com.samsung.android.dialer`) are completely exempt and will never be blocked. You can always answer incoming phone calls and make emergency calls.
+</details>
+
+<details>
+<summary><b>3. Why can't I access Android Settings during a lockdown?</b></summary>
+If the Android Settings application were accessible, a student facing academic frustration could simply open Settings, revoke Device Administrator or Accessibility permissions, and abort the lockdown. Blocking the Settings app seals this bypass vector completely.
+</details>
+
+<details>
+<summary><b>4. Does QIEZKA require root or bootloader unlocking?</b></summary>
+No. QIEZKA operates 100% within the standard Android framework using official APIs: `AccessibilityService`, `DeviceAdminReceiver`, `AlarmManager`, and `WindowManager`. No root, no Magisk/KernelSU, and no bootloader unlocking are required.
+</details>
+
+<details>
+<summary><b>5. Are my homework photos and notes stored on any server?</b></summary>
+No. QIEZKA has zero central servers, zero accounts, and zero proprietary backends. Your homework photographs and study notes stay on your device. During grading, photos are transmitted directly from your phone to Google Gemini / OCR.space over encrypted HTTPS using your personal API key.
+</details>
 
 ---
 
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+<div align="center">
+
+**Built with uncompromising focus for students, researchers, and builders.**
+
+</div>
