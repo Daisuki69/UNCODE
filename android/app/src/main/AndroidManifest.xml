@@ -29,6 +29,18 @@
     <!-- Notifications: lock status, timers, and alerts (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Full screen intent & foreground service permissions for high-priority alerts -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Exact Alarms: background schedule triggers and countdown warnings (Android 12+) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- Overlay: display lock screen over other apps and background launches (Android 10+) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -43,6 +55,7 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:excludeFromRecents="true"
             android:exported="true">
 
             <intent-filter>
@@ -83,6 +96,7 @@
         <service
             android:name=".LockAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:stopWithTask="false"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
@@ -103,6 +117,25 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
+
+        <!-- ===== Alarm Receiver ===== -->
+        <!-- Handles exact schedule starts, lock end auto-release, and advance notifications -->
+        <receiver
+            android:name=".AlarmReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- ===== Floating Assistive Timer Ball Service ===== -->
+        <!-- Draws a floating countdown pill over all apps and maintains foreground process immunity -->
+        <service
+            android:name=".FloatingOverlayService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Floating study countdown overlay and lockdown monitoring" />
+        </service>
 
     </application>
 

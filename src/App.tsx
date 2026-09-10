@@ -6,7 +6,7 @@ import { EvaluationResult } from './components/EvaluationResult';
 import { Onboarding } from './components/Onboarding';
 import { Loader2, AlertTriangle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { startLockdown, endLockdown, getInstalledApps, checkPermissions } from './systemBridge';
+import { startLockdown, endLockdown, getInstalledApps, checkPermissions, syncSchedules, getLockStatus, syncTimeOffset, requestNotificationPermission } from './systemBridge';
 import { loadData, saveData } from './storage';
 import { isAppBlacklisted } from './constants/blacklistedApps';
 import { isMessagingPackage, isHiddenSystemExemptApp } from './constants/allowedApps';
@@ -106,7 +106,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isLoaded) saveData('studom_timeOffset', timeOffset);
+    if (isLoaded) {
+      saveData('studom_timeOffset', timeOffset);
+      syncTimeOffset(timeOffset);
+    }
   }, [timeOffset, isLoaded]);
 
   const [timeUntilLock, setTimeUntilLock] = useState<number | null>(null);
@@ -118,6 +121,9 @@ export default function App() {
 
   // Global Permission Checking (on mount and on resume)
   useEffect(() => {
+    // Prompt for Android 13+ POST_NOTIFICATIONS runtime permission on startup
+    requestNotificationPermission().catch(() => {});
+
     if (appState === 'onboarding' || appState === 'permission_walkthrough') return;
     
     const verify = async () => {
@@ -212,11 +218,25 @@ export default function App() {
       }
 
       setSettings(loadedSettings);
-      setAppState(loadedSettings.onboardingComplete ? 'dashboard' : 'onboarding');
       setResources(loadedResources);
       setLogs(loadedLogs);
       setCompletedHomeworks(loadedCompletedHomeworks);
       setTimeOffset(loadedTimeOffset);
+
+      // Check native lock status immediately upon loading
+      try {
+        const lockStatus = await getLockStatus();
+        if (lockStatus && lockStatus.isLockActive) {
+          if (lockStatus.lockEndTime > 0) setLockEndTime(lockStatus.lockEndTime);
+          if (lockStatus.activeScheduleId) setActiveScheduleId(lockStatus.activeScheduleId);
+          setAppState('locked');
+        } else {
+          setAppState(loadedSettings.onboardingComplete ? 'dashboard' : 'onboarding');
+        }
+      } catch {
+        setAppState(loadedSettings.onboardingComplete ? 'dashboard' : 'onboarding');
+      }
+
       // Immediately mark as loaded to instantly render the app screen
       setIsLoaded(true);
 
@@ -247,13 +267,56 @@ export default function App() {
 
   const getCurrentTime = useCallback(() => Date.now() + timeOffset, [timeOffset]);
 
+  // Keep UI in sync with native lock status when app is brought to foreground or resumes
   useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          const status = await getLockStatus();
+          if (status && status.isLockActive) {
+            if (status.lockEndTime > 0) setLockEndTime(status.lockEndTime);
+            if (status.activeScheduleId) setActiveScheduleId(status.activeScheduleId);
+            setAppState(prev => (prev !== 'evaluating' && prev !== 'result' ? 'locked' : prev));
+          } else {
+            setAppState(prev => (prev === 'locked' ? 'dashboard' : prev));
+          }
+        } catch (e) {
+          console.warn('Failed to refresh lock status on visibility change', e);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, []);
+
+  // Synchronize schedules & allowed apps with native AlarmManager and SharedPreferences
+  useEffect(() => {
+    if (!isLoaded) return;
+    const safeAllowedApps = (settings.allowedApps || []).filter(a => !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name));
+    syncSchedules(settings.schedules || [], safeAllowedApps.map(a => a.id));
+  }, [settings.schedules, settings.allowedApps, isLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
     const activeSchedules = settings.schedules?.filter(s => s.isActive) || [];
     
     if (activeSchedules.length === 0) {
       if (appState === 'locked') {
-        endLockdown();
-        navigate('dashboard');
+        getLockStatus().then(st => {
+          if (!st || !st.isLockActive) {
+            endLockdown();
+            navigate('dashboard');
+          }
+        }).catch(() => {
+          endLockdown();
+          navigate('dashboard');
+        });
       }
       setTimeUntilLock(null);
       setNextActivationDate(null);
@@ -298,11 +361,11 @@ export default function App() {
         }
 
         if (inWindow) {
-          setLockEndTime(lockEnd);
           setActiveScheduleId(schedule.id);
           if (appState !== 'locked' && appState !== 'evaluating' && appState !== 'result') {
+            setLockEndTime(lockEnd);
             const safeAllowedApps = (settings.allowedApps || []).filter(a => !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name));
-            startLockdown(safeAllowedApps.map(a => a.id));
+            startLockdown(safeAllowedApps.map(a => a.id), schedule.durationMinutes, lockEnd, schedule.id);
             navigate('locked');
           }
           foundActive = true;
@@ -323,8 +386,15 @@ export default function App() {
 
       if (!foundActive) {
         if (appState === 'locked') {
-          endLockdown();
-          navigate('dashboard');
+          getLockStatus().then(st => {
+            if (!st || !st.isLockActive) {
+              endLockdown();
+              navigate('dashboard');
+            }
+          }).catch(() => {
+            endLockdown();
+            navigate('dashboard');
+          });
         }
 
         if (nearestUpcomingTime !== null && nearestScheduleDate !== null) {
@@ -341,7 +411,7 @@ export default function App() {
     checkSchedule();
     const interval = setInterval(checkSchedule, 1000);
     return () => clearInterval(interval);
-  }, [settings.schedules, appState, timeOffset]);
+  }, [settings.schedules, appState, timeOffset, isLoaded]);
 
   const notifyUser = (message: string) => {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
@@ -643,14 +713,27 @@ export default function App() {
           </motion.div>
         )}
 
-        {appState === 'locked' && activeScheduleId && lockEndTime && (
+        {appState === 'locked' && lockEndTime && (
           <motion.div key="locked" custom={navDirection} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3, ease: 'easeOut' }} className="absolute inset-0 overflow-y-auto bg-gray-50 flex flex-col w-full h-full">
             <LockScreen 
-              schedule={settings.schedules.find(s => s.id === activeScheduleId)!}
+              schedule={
+                (settings.schedules || []).find(s => s.id === activeScheduleId) ||
+                (settings.schedules && settings.schedules.length > 0 ? settings.schedules[0] : null) || {
+                  id: activeScheduleId || 'active-session',
+                  title: 'Study Session',
+                  homeworkContent: 'Stay focused on your task until the timer expires.',
+                  rubricMode: 'points',
+                  rubricContent: 'Do not exit until timer completes.',
+                  selectedResourceIds: [],
+                  activationTime: '00:00',
+                  durationMinutes: 25,
+                  isActive: true,
+                }
+              }
               settings={settings}
               resources={resources}
               lockEndTime={lockEndTime}
-              onSubmitHomework={(file, ocrType, text) => handleSubmitHomework(file, activeScheduleId, ocrType, text)}
+              onSubmitHomework={(file, ocrType, text) => handleSubmitHomework(file, activeScheduleId || 'active-session', ocrType, text)}
               onTimeout={handleTimeout}
               getCurrentTime={getCurrentTime}
               onTimeOverride={handleTimeOverride}

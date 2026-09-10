@@ -38,9 +38,7 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
   const [ocrError, setOcrError] = useState<string | null>(null);
 
   const [ocrType, setOcrType] = useState<'simple' | 'formatted'>(settings.defaultOcrType || 'simple');
-  const [showUploadPicker, setShowUploadPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Load from local storage on mount
   useEffect(() => {
@@ -149,24 +147,29 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
   };
 
   useEffect(() => {
-    const timer = setInterval(() => {
+    const update = () => {
       const now = getCurrentTime();
       const remaining = Math.max(0, Math.floor((lockEndTime - now) / 1000));
       setTimeLeft(remaining);
       
       if (remaining === 0) {
-        clearInterval(timer);
         endLockdown(); // Instantly release kiosk mode / lock task mode
         // Retain draft in lockscreen_last_draft so student can re-lock and submit without losing work
         onTimeout();
       }
-    }, 1000);
+    };
+    update();
+    const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
   }, [lockEndTime, onTimeout, getCurrentTime, schedule.id]);
 
   const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
@@ -369,7 +372,7 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
             <div className="w-full">
               <button
                 type="button"
-                onClick={() => setShowUploadPicker(true)}
+                onClick={() => fileInputRef.current?.click()}
                 className="group w-full p-6 sm:p-7 rounded-2xl border-2 border-dashed border-gray-700 hover:border-indigo-500 bg-gray-950/50 hover:bg-gray-900/80 transition-all flex flex-col items-center justify-center text-center cursor-pointer shadow-sm hover:shadow-indigo-500/10"
               >
                 <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 group-hover:scale-105 flex items-center justify-center mb-3 transition-all relative">
@@ -378,10 +381,10 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
                 </div>
                 <span className="text-white font-bold text-base mb-1">Upload Homework</span>
                 <span className="text-gray-400 text-xs leading-relaxed max-w-sm">
-                  Tap to choose Camera or Files & Gallery
+                  Tap to capture with camera or choose from gallery / files
                 </span>
                 <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-semibold text-indigo-400 bg-indigo-950/40 px-2.5 py-0.5 rounded-full border border-indigo-900/50">
-                  <span>Camera + Files Supported</span>
+                  <span>Camera + Gallery Supported</span>
                 </div>
               </button>
             </div>
@@ -395,7 +398,6 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
                     setSelectedFile(null);
                     setPreviewUrl(null);
                     setTranscribedText(null);
-                    if (cameraInputRef.current) cameraInputRef.current.value = '';
                     if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
                   className="absolute top-4 right-4 bg-gray-900/80 p-2 rounded-full hover:bg-red-600 transition-colors"
@@ -458,91 +460,10 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
           <input 
             type="file" 
             accept="image/*" 
-            capture="environment"
-            ref={cameraInputRef} 
-            className="hidden" 
-            onChange={handleFileChange}
-          />
-          <input 
-            type="file" 
-            accept="image/*" 
             ref={fileInputRef} 
             className="hidden" 
             onChange={handleFileChange}
           />
-
-          {/* Action Sheet / Popup for Camera vs Files */}
-          {showUploadPicker && (
-            <div 
-              className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-150"
-              onClick={() => setShowUploadPicker(false)}
-            >
-              <div 
-                className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col gap-3 relative animate-in zoom-in-95 duration-150"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between pb-2 border-b border-gray-800">
-                  <h3 className="text-white font-bold text-sm uppercase tracking-wider flex items-center gap-2">
-                    <Upload className="w-4 h-4 text-indigo-400" />
-                    Select Upload Source
-                  </h3>
-                  <button 
-                    type="button"
-                    onClick={() => setShowUploadPicker(false)}
-                    className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                
-                <p className="text-xs text-gray-400 text-left mb-1">
-                  How would you like to provide your homework photo?
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowUploadPicker(false);
-                    cameraInputRef.current?.click();
-                  }}
-                  className="w-full p-4 rounded-2xl bg-gray-800/80 hover:bg-gray-800 border border-gray-700/80 hover:border-indigo-500 flex items-center gap-3.5 transition group text-left cursor-pointer"
-                >
-                  <div className="w-11 h-11 rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 flex items-center justify-center shrink-0">
-                    <Camera className="w-6 h-6" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-white group-hover:text-indigo-300">Camera</span>
-                    <span className="text-xs text-gray-400">Take a fresh photo of your handwritten work</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowUploadPicker(false);
-                    fileInputRef.current?.click();
-                  }}
-                  className="w-full p-4 rounded-2xl bg-gray-800/80 hover:bg-gray-800 border border-gray-700/80 hover:border-indigo-500 flex items-center gap-3.5 transition group text-left cursor-pointer"
-                >
-                  <div className="w-11 h-11 rounded-xl bg-sky-500/10 text-sky-400 group-hover:bg-sky-500/20 flex items-center justify-center shrink-0">
-                    <Upload className="w-6 h-6" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-white group-hover:text-sky-300">Files & Gallery</span>
-                    <span className="text-xs text-gray-400">Choose an existing image or document</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowUploadPicker(false)}
-                  className="w-full py-2.5 bg-gray-950 hover:bg-gray-800 text-gray-400 hover:text-white rounded-xl text-xs font-bold transition border border-gray-800 mt-1 cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
         </div>
         
         <div className="w-full bg-gray-900 border border-gray-800 rounded-2xl p-6 mt-8">

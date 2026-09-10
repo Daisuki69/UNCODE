@@ -298,7 +298,55 @@ public final class BlacklistConstants {
         "com.thecarousell.Carousell",           // Carousell
         "fr.vinted",                           // Vinted
         "io.depop",                            // Depop
-        "com.xunmeng.pinduoduo"                // Pinduoduo
+        "com.xunmeng.pinduoduo",               // Pinduoduo
+
+        // ── Hyper-Casual, .IO & Satisfying Time-Wasters ──
+        "io.voodoo.holeio",                    // Hole.io
+        "com.furunwang.woodturning",           // Woodturning 3D
+        "com.voodoo.woodturning",              // Woodturning 3D (Voodoo)
+        "io.voodoo.paperio",                   // Paper.io
+        "io.voodoo.paper2",                    // Paper.io 2
+        "com.h8games.helixjump",               // Helix Jump
+        "io.voodoo.crowdcity",                 // Crowd City
+        "com.cassette.aquapark",               // Aquapark.io
+        "io.voodoo.flappydunk",                // Flappy Dunk
+        "air.com.hypah.io.slither",            // Slither.io
+        "com.miniclip.agar.io",                // Agar.io
+        "com.miniclip.diep.io",                // Diep.io
+        "com.amelosinteractive.snake",         // Snake.io
+        "com.gorilla.boltrend.survivorio",     // Survivor!.io
+        "com.habby.survivorio",                // Survivor!.io
+        "com.habby.archero",                   // Archero
+        "com.freeplay.clash3d",                // Join Clash 3D
+        "com.superpow.snake",                  // Join Clash 3D Alternative
+        "com.garawell.bridgerace",             // Bridge Race
+        "com.pronetis.ironball",               // Going Balls
+        "com.supersonic.tallmanrun",           // Tall Man Run
+        "com.kitkagames.fallbuddies",          // Stumble Guys
+        "com.amanotes.pamadiscodancing",       // Tiles Hop: EDM Rush!
+        "com.youmusic.magictiles",             // Magic Tiles 3
+        "com.fortafygames.colorswitch",        // Color Switch
+        "com.yodo1.crossyroad",                // Crossy Road
+        "com.halfbrick.fruitninjafree",        // Fruit Ninja
+        "com.zeptolab.ctr.ads",                // Cut the Rope
+        "com.easybrain.block.puzzle.game",     // Blockudoku
+        "com.androbaby.game2048",              // 2048
+        "com.ketchapp.stack",                  // Stack
+        "com.ketchapp.knifehit",               // Knife Hit
+        "com.ketchapp.rider",                  // Rider
+        "com.mhappsgaming.sandballs",          // Sand Balls
+        "com.saygames.johnnytrigger",          // Johnny Trigger
+        "com.redfox.myhotel",                  // My Perfect Hotel
+        "com.saygames.racemaster",             // Race Master 3D
+        "com.rolllic.hairchallenge",           // Hair Challenge
+        "com.zynga.highheels",                 // High Heels!
+        "com.crazylabs.tiedye",                // Tie Dye
+        "com.crazylabs.asmr.slicing",          // ASMR Slicing
+        "com.crazylabs.soapcutting",           // Soap Cutting
+        "com.lionstudios.happyglass",          // Happy Glass
+        "com.lionstudios.savethegirl",         // Save The Girl
+        "com.lionstudios.mrbullet",            // Mr Bullet
+        "com.lionstudios.pullhimout"           // Pull Him Out
     ));
 
     public static boolean isBlacklisted(String packageName) {
@@ -352,6 +400,23 @@ public final class BlacklistConstants {
                lower.contains("fanduel") ||
                lower.contains("carousell") ||
                lower.contains("vinted") ||
-               lower.contains("depop");
+               lower.contains("depop") ||
+               lower.contains("holeio") ||
+               lower.contains("woodturning") ||
+               lower.contains("paperio") ||
+               lower.contains("helixjump") ||
+               lower.contains("crowdcity") ||
+               lower.contains("aquapark") ||
+               lower.contains("slither") ||
+               lower.contains("agar.io") ||
+               lower.contains("snake.io") ||
+               lower.contains("survivorio") ||
+               lower.contains("bridgerace") ||
+               lower.contains("stumbleguys") ||
+               lower.contains("voodoo") ||
+               lower.contains("saygames") ||
+               lower.contains("lionstudios") ||
+               lower.contains("crazylabs") ||
+               lower.contains("ketchapp");
     }
 }

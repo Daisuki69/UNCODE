@@ -44,8 +44,19 @@ import android.provider.MediaStore;
 import android.provider.Settings;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.InputMethodInfo;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+import com.getcapacitor.PermissionState;
 
-@CapacitorPlugin(name = "LockPlugin")
+@CapacitorPlugin(
+    name = "LockPlugin",
+    permissions = {
+        @Permission(
+            alias = "notifications",
+            strings = { android.Manifest.permission.POST_NOTIFICATIONS }
+        )
+    }
+)
 public class LockPlugin extends Plugin {
 
     private static final String TAG = "LockPlugin";
@@ -61,10 +72,44 @@ public class LockPlugin extends Plugin {
         prefs = getActivity().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
+    private Long getLongFromCall(PluginCall call, String key) {
+        if (call == null || call.getData() == null) return null;
+        Object val = call.getData().opt(key);
+        if (val instanceof Number) {
+            return ((Number) val).longValue();
+        }
+        if (val instanceof String) {
+            try {
+                return Long.parseLong((String) val);
+            } catch (NumberFormatException ignored) {}
+        }
+        return null;
+    }
+
     @PluginMethod
     public void startLockdown(PluginCall call) {
         try {
             JSArray allowedAppIds = call.getArray("allowedAppIds");
+            long durationMinutes = call.getInt("durationMinutes", 25);
+            Long customEndTime = getLongFromCall(call, "lockEndTime");
+            String scheduleId = call.getString("scheduleId", "");
+
+            long timeOffset = prefs.getLong("time_offset", 0L);
+            long effectiveNow = System.currentTimeMillis() + timeOffset;
+
+            boolean currentlyActive = prefs.getBoolean("lockdown_active", false);
+            long existingEndTime = prefs.getLong("lock_end_time", 0L);
+
+            long lockEndTime;
+            if (customEndTime != null && customEndTime > 0) {
+                lockEndTime = customEndTime;
+            } else if (currentlyActive && existingEndTime > effectiveNow) {
+                // If lockdown is already active and still has time remaining, preserve ongoing timer!
+                lockEndTime = existingEndTime;
+                Log.i(TAG, "startLockdown: Preserving active ongoing lockEndTime=" + lockEndTime);
+            } else {
+                lockEndTime = effectiveNow + (durationMinutes * 60L * 1000L);
+            }
 
             Set<String> whitelist = new HashSet<>();
             whitelist.add(getActivity().getPackageName()); // Always allow QIEZKA itself
@@ -105,11 +150,19 @@ public class LockPlugin extends Plugin {
                 }
             }
 
-            // Save whitelist for AccessibilityService
+            // Save whitelist and timestamp for AccessibilityService
             prefs.edit()
                     .putStringSet("whitelist", whitelist)
                     .putBoolean("lockdown_active", true)
+                    .putLong("lock_end_time", lockEndTime)
+                    .putString("active_schedule_id", scheduleId)
                     .apply();
+
+            // Schedule exact lock end auto-release alarm
+            AlarmReceiver.scheduleLockEndAlarm(getActivity(), lockEndTime, scheduleId);
+
+            // Start Floating Assistive Timer Ball Overlay
+            FloatingOverlayService.startService(getActivity(), lockEndTime, scheduleId);
 
             // If Device Owner: protect QIEZKA from force-stop and uninstall
             if (dpm.isDeviceOwnerApp(getActivity().getPackageName())) {
@@ -118,7 +171,9 @@ public class LockPlugin extends Plugin {
                 Log.i(TAG, "Lockdown active as Device Owner — uninstall blocked");
             }
 
-            call.resolve();
+            JSObject ret = new JSObject();
+            ret.put("lockEndTime", lockEndTime);
+            call.resolve(ret);
         } catch (Exception e) {
             Log.e(TAG, "startLockdown failed", e);
             call.reject("startLockdown failed: " + e.getMessage());
@@ -130,8 +185,13 @@ public class LockPlugin extends Plugin {
         try {
             prefs.edit()
                     .putBoolean("lockdown_active", false)
+                    .remove("lock_end_time")
+                    .remove("active_schedule_id")
                     .putStringSet("whitelist", new HashSet<>())
                     .apply();
+
+            AlarmReceiver.cancelLockEndAlarm(getActivity());
+            FloatingOverlayService.stopService(getActivity());
 
             // If Device Owner: re-allow uninstall when lockdown ends
             if (dpm.isDeviceOwnerApp(getActivity().getPackageName())) {
@@ -143,6 +203,88 @@ public class LockPlugin extends Plugin {
         } catch (Exception e) {
             Log.e(TAG, "endLockdown failed", e);
             call.reject("endLockdown failed: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void getLockStatus(PluginCall call) {
+        try {
+            boolean isActive = prefs.getBoolean("lockdown_active", false);
+            long lockEndTime = prefs.getLong("lock_end_time", 0L);
+            String scheduleId = prefs.getString("active_schedule_id", "");
+
+            long timeOffset = prefs.getLong("time_offset", 0L);
+            long effectiveNow = System.currentTimeMillis() + timeOffset;
+
+            // Native timestamp auto-expire
+            if (isActive && lockEndTime > 0 && effectiveNow >= lockEndTime) {
+                isActive = false;
+                prefs.edit()
+                        .putBoolean("lockdown_active", false)
+                        .remove("lock_end_time")
+                        .remove("active_schedule_id")
+                        .apply();
+                AlarmReceiver.cancelLockEndAlarm(getActivity());
+                FloatingOverlayService.stopService(getActivity());
+            }
+
+            JSObject ret = new JSObject();
+            ret.put("isLockActive", isActive);
+            ret.put("lockEndTime", lockEndTime);
+            ret.put("activeScheduleId", scheduleId);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "getLockStatus failed", e);
+            call.reject("getLockStatus failed: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void syncTimeOffset(PluginCall call) {
+        try {
+            Long timeOffset = getLongFromCall(call, "timeOffset");
+            if (timeOffset == null) timeOffset = 0L;
+            prefs.edit().putLong("time_offset", timeOffset).apply();
+            Log.i(TAG, "Synchronized timeOffset to native: " + timeOffset + "ms");
+
+            ScheduleManager.rescheduleAll(getActivity());
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "syncTimeOffset failed", e);
+            call.reject("syncTimeOffset failed: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void syncSchedules(PluginCall call) {
+        try {
+            JSArray schedulesArr = call.getArray("schedules");
+            JSArray allowedAppIds = call.getArray("allowedAppIds");
+
+            String schedulesJson = schedulesArr != null ? schedulesArr.toString() : "[]";
+
+            Set<String> whitelist = new HashSet<>();
+            whitelist.add(getActivity().getPackageName());
+            if (allowedAppIds != null) {
+                for (int i = 0; i < allowedAppIds.length(); i++) {
+                    String appId = allowedAppIds.getString(i);
+                    if (appId != null && !BlacklistConstants.isBlacklisted(appId)) {
+                        whitelist.add(appId);
+                    }
+                }
+            }
+
+            ScheduleManager.syncSchedules(getActivity(), schedulesJson, whitelist);
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "syncSchedules failed", e);
+            call.reject("syncSchedules failed: " + e.getMessage());
         }
     }
 
@@ -702,6 +844,17 @@ public class LockPlugin extends Plugin {
         } catch (Exception e) {}
         result.put("isNotificationGranted", isNotificationGranted);
 
+        boolean isExactAlarmGranted = true;
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                android.app.AlarmManager am = (android.app.AlarmManager) getActivity().getSystemService(Context.ALARM_SERVICE);
+                if (am != null) {
+                    isExactAlarmGranted = am.canScheduleExactAlarms();
+                }
+            }
+        } catch (Exception e) {}
+        result.put("isExactAlarmGranted", isExactAlarmGranted);
+
         call.resolve(result);
     }
 
@@ -733,21 +886,46 @@ public class LockPlugin extends Plugin {
     public void requestNotificationPermission(PluginCall call) {
         try {
             if (android.os.Build.VERSION.SDK_INT >= 33) {
-                if (androidx.core.content.ContextCompat.checkSelfPermission(
-                    getActivity(), android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    androidx.core.app.ActivityCompat.requestPermissions(
-                        getActivity(), new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 1003);
+                if (getPermissionState("notifications") != PermissionState.GRANTED) {
+                    requestPermissionForAlias("notifications", call, "notificationPermCallback");
+                    return;
                 }
-            } else {
+            }
+            JSObject ret = new JSObject();
+            ret.put("granted", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            try {
                 Intent intent = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
                 intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getActivity().getPackageName());
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 getActivity().startActivity(intent);
+                call.resolve();
+            } catch (Exception ex) {
+                Log.e(TAG, "Failed to request notification permission", ex);
+                call.reject("Failed to request notification permission: " + ex.getMessage());
             }
+        }
+    }
+
+    @PermissionCallback
+    private void notificationPermCallback(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("granted", getPermissionState("notifications") == PermissionState.GRANTED);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void openNotificationSettings(PluginCall call) {
+        try {
+            Intent intent = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+            intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getActivity().getPackageName());
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getActivity().startActivity(intent);
             call.resolve();
         } catch (Exception e) {
-            Log.e(TAG, "Failed to request notification permission", e);
-            call.reject("Failed to request notification permission: " + e.getMessage());
+            Log.e(TAG, "Failed to open notification settings", e);
+            call.reject("Failed to open notification settings: " + e.getMessage());
         }
     }
     

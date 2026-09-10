@@ -2,7 +2,12 @@ import { registerPlugin } from '@capacitor/core';
 import { AllowedApp } from './types';
 
 interface LockPluginInterface {
-  startLockdown(options: { allowedAppIds: string[] }): Promise<void>;
+  startLockdown(options: {
+    allowedAppIds: string[];
+    durationMinutes?: number;
+    lockEndTime?: number;
+    scheduleId?: string;
+  }): Promise<void>;
   endLockdown(): Promise<void>;
   getInstalledApps(): Promise<{ apps: AllowedApp[] }>;
   checkPermissions(): Promise<{
@@ -11,6 +16,9 @@ interface LockPluginInterface {
     isAdminActive: boolean;
     isBatteryOptimizationIgnored: boolean;
     isNotificationGranted: boolean;
+    isExactAlarmGranted?: boolean;
+    isAdbInstall?: boolean;
+    installSource?: string;
   }>;
   openAccessibilitySettings(): Promise<void>;
   openDeviceAdminSettings(): Promise<void>;
@@ -18,18 +26,37 @@ interface LockPluginInterface {
   openAppInfo(): Promise<void>;
   requestBatteryOptimization(): Promise<void>;
   requestNotificationPermission(): Promise<void>;
+  openNotificationSettings(): Promise<void>;
   exportBackup(options: { tempFileName: string; defaultName: string }): Promise<void>;
+  syncSchedules(options: { schedules: any[]; allowedAppIds: string[] }): Promise<void>;
+  syncTimeOffset(options: { timeOffset: number }): Promise<void>;
+  getLockStatus(): Promise<{
+    isLockActive: boolean;
+    lockEndTime: number;
+    activeScheduleId?: string;
+  }>;
 }
 
 // Register the native plugin - falls back gracefully in browser/dev mode
 const LockPlugin = registerPlugin<LockPluginInterface>('LockPlugin', {
   web: {
-    startLockdown: async (opts: { allowedAppIds: string[] }) => {
-      console.log('[Dev] Simulating lockdown with:', opts.allowedAppIds);
+    startLockdown: async (opts: { allowedAppIds: string[]; durationMinutes?: number; lockEndTime?: number; scheduleId?: string }) => {
+      console.log('[Dev] Simulating lockdown with:', opts);
     },
     endLockdown: async () => {
       console.log('[Dev] Simulating lockdown release');
     },
+    syncSchedules: async (opts: { schedules: any[]; allowedAppIds: string[] }) => {
+      console.log('[Dev] Simulating syncSchedules:', opts);
+    },
+    syncTimeOffset: async (opts: { timeOffset: number }) => {
+      console.log('[Dev] Simulating syncTimeOffset:', opts);
+    },
+    getLockStatus: async () => ({
+      isLockActive: false,
+      lockEndTime: 0,
+      activeScheduleId: undefined,
+    }),
     getInstalledApps: async () => ({
       apps: [
         { id: 'com.google.chrome', name: 'Chrome', iconName: 'Globe', isHardcoded: true, isBrowser: true },
@@ -49,6 +76,7 @@ const LockPlugin = registerPlugin<LockPluginInterface>('LockPlugin', {
       isAdminActive: true,
       isBatteryOptimizationIgnored: true,
       isNotificationGranted: true,
+      isExactAlarmGranted: true,
       isAdbInstall: true,
       installSource: 'ADB (PC Script / USB)',
     }), // Mock true for web dev
@@ -58,6 +86,7 @@ const LockPlugin = registerPlugin<LockPluginInterface>('LockPlugin', {
     openAppInfo: async () => console.log('[Dev] Opening App Info'),
     requestBatteryOptimization: async () => console.log('[Dev] Requesting Battery Optimization'),
     requestNotificationPermission: async () => console.log('[Dev] Requesting Notification Permission'),
+    openNotificationSettings: async () => console.log('[Dev] Opening Notification Settings'),
     exportBackup: async (opts: { tempFileName: string; defaultName: string }) => console.log('[Dev] Exporting backup', opts),
   },
 });
@@ -145,8 +174,21 @@ export const requestNotificationPermission = async (): Promise<void> => {
   }
 };
 
-export const startLockdown = (allowedAppIds: string[]) => {
-  LockPlugin.startLockdown({ allowedAppIds }).catch(e => {
+export const openNotificationSettings = async (): Promise<void> => {
+  try {
+    await LockPlugin.openNotificationSettings();
+  } catch (e) {
+    console.error('Failed to open notification settings', e);
+  }
+};
+
+export const startLockdown = (
+  allowedAppIds: string[],
+  durationMinutes?: number,
+  lockEndTime?: number,
+  scheduleId?: string
+) => {
+  LockPlugin.startLockdown({ allowedAppIds, durationMinutes, lockEndTime, scheduleId }).catch(e => {
     console.error('startLockdown failed', e);
   });
 };
@@ -155,6 +197,35 @@ export const endLockdown = () => {
   LockPlugin.endLockdown().catch(e => {
     console.error('endLockdown failed', e);
   });
+};
+
+export const syncSchedules = async (schedules: any[], allowedAppIds: string[]): Promise<void> => {
+  try {
+    await LockPlugin.syncSchedules({ schedules, allowedAppIds });
+  } catch (e) {
+    console.error('syncSchedules failed', e);
+  }
+};
+
+export const syncTimeOffset = async (timeOffset: number): Promise<void> => {
+  try {
+    await LockPlugin.syncTimeOffset({ timeOffset });
+  } catch (e) {
+    console.error('syncTimeOffset failed', e);
+  }
+};
+
+export const getLockStatus = async (): Promise<{
+  isLockActive: boolean;
+  lockEndTime: number;
+  activeScheduleId?: string;
+}> => {
+  try {
+    return await LockPlugin.getLockStatus();
+  } catch (e) {
+    console.error('getLockStatus failed', e);
+    return { isLockActive: false, lockEndTime: 0 };
+  }
 };
 
 export const exportBackup = async (tempFileName: string, defaultName: string): Promise<void> => {

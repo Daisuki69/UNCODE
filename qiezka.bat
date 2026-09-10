@@ -134,7 +134,9 @@ if /i "!GRANT_SECURE_PERMISSIONS!"=="true" (
     adb.exe shell pm grant com.uncode.app android.permission.WRITE_SECURE_SETTINGS >nul 2>&1
     adb.exe shell pm grant com.uncode.app android.permission.DUMP >nul 2>&1
     adb.exe shell pm grant com.uncode.app android.permission.POST_NOTIFICATIONS >nul 2>&1
-    echo       WRITE_SECURE_SETTINGS, DUMP, and POST_NOTIFICATIONS: GRANTED.
+    adb.exe shell appops set com.uncode.app SYSTEM_ALERT_WINDOW allow >nul 2>&1
+    adb.exe shell appops set com.uncode.app SCHEDULE_EXACT_ALARM allow >nul 2>&1
+    echo       WRITE_SECURE_SETTINGS, DUMP, POST_NOTIFICATIONS, SYSTEM_ALERT_WINDOW, and SCHEDULE_EXACT_ALARM: GRANTED.
 ) else (
     echo       Secure permissions: SKIPPED [Configured: false].
 )
