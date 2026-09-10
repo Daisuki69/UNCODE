@@ -69,7 +69,7 @@ public class LockAccessibilityService extends AccessibilityService {
      * Common OEM cameras, galleries, and system file/photo pickers.
      * These must be exempt so users can take photos or upload images to submit homework.
      */
-    private static final Set<String> MEDIA_AND_FILE_EXEMPT = new HashSet<>(Arrays.asList(
+    public static final Set<String> MEDIA_AND_FILE_EXEMPT = new HashSet<>(Arrays.asList(
         // Camera apps
         "com.google.android.GoogleCamera",
         "com.sec.android.app.camera",

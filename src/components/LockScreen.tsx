@@ -24,7 +24,10 @@ interface LockScreenProps {
 }
 
 export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmitHomework, onTimeout, getCurrentTime, onTimeOverride, timeOffset, onResetTime, onSettingsChange, installedApps = [] }: LockScreenProps) {
-  const [timeLeft, setTimeLeft] = useState(() => Math.max(0, Math.floor((lockEndTime - getCurrentTime()) / 1000)));
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const maxSec = (schedule.durationMinutes || 25) * 60;
+    return Math.min(maxSec, Math.max(0, Math.floor((lockEndTime - getCurrentTime()) / 1000)));
+  });
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -149,8 +152,10 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
   useEffect(() => {
     const update = () => {
       const now = getCurrentTime();
-      const remaining = Math.max(0, Math.floor((lockEndTime - now) / 1000));
-      setTimeLeft(remaining);
+      const maxAllowedSec = (schedule.durationMinutes || 25) * 60;
+      const rawRemaining = Math.max(0, Math.floor((lockEndTime - now) / 1000));
+      const remaining = Math.min(maxAllowedSec, rawRemaining);
+      setTimeLeft(prev => (prev !== remaining ? remaining : prev));
       
       if (remaining === 0) {
         endLockdown(); // Instantly release kiosk mode / lock task mode
@@ -161,7 +166,7 @@ export function LockScreen({ schedule, settings, resources, lockEndTime, onSubmi
     update();
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, [lockEndTime, onTimeout, getCurrentTime, schedule.id]);
+  }, [lockEndTime, onTimeout, getCurrentTime, schedule.id, schedule.durationMinutes]);
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);

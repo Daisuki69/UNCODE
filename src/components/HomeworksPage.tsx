@@ -24,7 +24,7 @@ export function HomeworksPage({ homeworks, onBack, onClear }: HomeworksPageProps
                 <ArrowLeft className="w-5 h-5 mr-1" /> Back
               </button>
             ) : (
-              <><FileText className="w-6 h-6 mr-2 text-indigo-500" /> Homeworks Completed</>
+              <><FileText className="w-6 h-6 mr-2 text-indigo-500" /> Homeworks Log</>
             )}
           </h2>
           <div className="flex gap-2">
@@ -45,7 +45,7 @@ export function HomeworksPage({ homeworks, onBack, onClear }: HomeworksPageProps
               {homeworks.length === 0 ? (
                 <div className="text-center text-gray-500 py-12 flex flex-col items-center">
                   <FileText className="w-12 h-12 text-gray-300 mb-3" />
-                  <p>No completed homeworks yet.</p>
+                  <p>No homework logs yet.</p>
                 </div>
               ) : (
                 homeworks.map(hw => (
@@ -56,12 +56,19 @@ export function HomeworksPage({ homeworks, onBack, onClear }: HomeworksPageProps
                   >
                     <div className="flex items-center">
                       {hw.passed ? (
-                        <CheckCircle className="w-5 h-5 text-emerald-500 mr-3" />
+                        <CheckCircle className="w-5 h-5 text-emerald-500 mr-3 flex-shrink-0" />
                       ) : (
-                        <XCircle className="w-5 h-5 text-red-500 mr-3" />
+                        <XCircle className="w-5 h-5 text-red-500 mr-3 flex-shrink-0" />
                       )}
                       <div>
-                        <h3 className="font-bold text-gray-900">{hw.title}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-gray-900">{hw.title}</h3>
+                          {!hw.passed && (
+                            <span className="text-[10px] uppercase font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-md">
+                              Failed / Expired
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-gray-400 mt-1">
                           {new Date(hw.timestamp).toLocaleDateString()} at {new Date(hw.timestamp).toLocaleTimeString()}
                         </p>

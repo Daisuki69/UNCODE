@@ -90,7 +90,7 @@ public class LockPlugin extends Plugin {
     public void startLockdown(PluginCall call) {
         try {
             JSArray allowedAppIds = call.getArray("allowedAppIds");
-            long durationMinutes = call.getInt("durationMinutes", 25);
+            long durationMinutes = Math.min(90, Math.max(1, call.getInt("durationMinutes", 25)));
             Long customEndTime = getLongFromCall(call, "lockEndTime");
             String scheduleId = call.getString("scheduleId", "");
 
@@ -149,6 +149,9 @@ public class LockPlugin extends Plugin {
                     }
                 }
             }
+
+            // Always exempt document pickers and media providers
+            whitelist.addAll(LockAccessibilityService.MEDIA_AND_FILE_EXEMPT);
 
             // Save whitelist and timestamp for AccessibilityService
             prefs.edit()

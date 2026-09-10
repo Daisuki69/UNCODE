@@ -241,8 +241,9 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
       return `${h12}:${mins.toString().padStart(2, '0')} ${ampm}`;
     };
 
+    const finalDuration = Math.min(90, Math.max(1, durationMinutes));
     const proposedStart = normalizeMinutes(activationTime);
-    const proposedEnd = proposedStart + durationMinutes;
+    const proposedEnd = proposedStart + finalDuration;
 
     for (const existing of existingSchedules) {
       if (!existing.isActive) continue;
@@ -266,7 +267,7 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
       rubricContent,
       selectedResourceIds,
       activationTime,
-      durationMinutes,
+      durationMinutes: finalDuration,
       isActive: true
     });
     localStorage.removeItem('draft_scheduleTitle');
@@ -393,15 +394,22 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
             </div>
 
             
-            {homeworkContent ? (
-              <div className="flex-1 w-full p-4 rounded-xl border border-gray-200 bg-gray-50 mb-6 overflow-y-auto">
-                <p className="font-mono text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">{homeworkContent}</p>
+            <div className="flex-1 w-full flex flex-col mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Homework Content / Requirements:</span>
+                <span className="text-xs text-indigo-600 font-medium">Editable</span>
               </div>
-            ) : (
-              <div className="flex-1 w-full p-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center mb-6 text-gray-400 text-sm">
-                Upload a document to extract homework requirements.
-              </div>
-            )}
+              <textarea
+                value={homeworkContent}
+                onChange={(e) => {
+                  setHomeworkContent(e.target.value);
+                  setValidationError(null);
+                  setSimilarityError(null);
+                }}
+                placeholder="Upload an image/document above, or type/edit your homework questions and instructions here..."
+                className="flex-1 w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm text-gray-800 leading-relaxed resize-y min-h-[160px]"
+              />
+            </div>
 
 
             {similarityError && (
@@ -542,13 +550,23 @@ export function CreateSchedule({ role, resources, apiKey, apiModel, existingSche
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Duration (Minutes)</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-bold text-gray-700">Duration (Minutes)</label>
+                  <span className="text-xs font-semibold text-gray-500">Max 90 mins</span>
+                </div>
                 <input
                   type="number"
                   min="1"
-                  max="300"
+                  max="90"
                   value={durationMinutes}
-                  onChange={(e) => setDurationMinutes(parseInt(e.target.value) || 60)}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value);
+                    if (isNaN(parsed)) {
+                      setDurationMinutes(1);
+                    } else {
+                      setDurationMinutes(Math.min(90, Math.max(1, parsed)));
+                    }
+                  }}
                   className="w-full px-4 py-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-red-500 text-lg"
                 />
               </div>

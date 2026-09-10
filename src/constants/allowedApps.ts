@@ -412,12 +412,15 @@ export function isStudentPackage(packageId?: string | null, appName?: string | n
  * Hardcoded by system policy to always be permitted during lockdown.
  */
 export const KNOWN_AI_PACKAGES: string[] = [
-  'com.google.android.apps.bard',                         // Google Gemini
+  'com.google.android.apps.bard',                         // Google Gemini (Bard)
+  'com.google.android.apps.gemini',                       // Google Gemini
+  'com.google.android.apps.googleassistant',              // Google Assistant / Gemini
   'com.openai.chatgpt',                                   // ChatGPT
   'com.anthropic.claude',                                 // Claude
   'com.microsoft.copilot',                                // Microsoft Copilot
   'ai.perplexity.app.android',                            // Perplexity AI
   'com.poe.android',                                      // Poe by Quora
+  'com.quora.poe.android',
   'com.deepseek.chat',                                    // DeepSeek
   'ai.inflection.pi',                                     // Pi AI
 ];
@@ -456,12 +459,58 @@ export function isAiPackage(packageId?: string | null, appName?: string | null):
 }
 
 /**
+ * Known Document Pickers, Media Module Providers, and OEM File Managers.
+ * These are hardcoded system exemptions that are completely exempt from blocking,
+ * but hidden from the user-facing Allowed Apps UI so homework uploads and file pickers work invisibly.
+ */
+export const KNOWN_DOCUMENT_PICKER_PACKAGES: string[] = [
+  'com.google.android.documentsui',
+  'com.android.documentsui',
+  'com.google.android.providers.media.module',
+  'com.android.providers.media',
+  'com.sec.android.app.myfiles',
+  'com.google.android.apps.nbu.files',
+  'com.mi.android.globalfileexplorer',
+  'com.coloros.filemanager',
+  'com.oneplus.filemanager',
+  'com.huawei.filemanager',
+  'com.vivo.filemanager',
+  'com.motorola.filemanager',
+  'com.asus.filemanager',
+];
+
+const DOCUMENT_PICKER_SET = new Set(KNOWN_DOCUMENT_PICKER_PACKAGES.map(p => p.toLowerCase()));
+
+export function isDocumentPickerPackage(packageId?: string | null, appName?: string | null): boolean {
+  if (packageId) {
+    const lowerId = packageId.trim().toLowerCase();
+    if (DOCUMENT_PICKER_SET.has(lowerId) || lowerId.includes('documentsui')) {
+      return true;
+    }
+  }
+  if (appName) {
+    const lowerName = appName.trim().toLowerCase();
+    if (
+      lowerName === 'files' ||
+      lowerName === 'my files' ||
+      lowerName === 'file manager' ||
+      lowerName === 'documents' ||
+      lowerName.includes('documentsui')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Returns true if an application is an internal OS infrastructure exemption
- * (keyboards, camera extension proxies, lens launchers, stub players).
+ * (keyboards, camera extension proxies, lens launchers, stub players, document pickers).
  * These apps are completely allowed during lockdown, but their icons are hidden from the UI.
  */
 export function isHiddenSystemExemptApp(packageId?: string | null, appName?: string | null): boolean {
   if (isKeyboardPackage(packageId, appName)) return true;
+  if (isDocumentPickerPackage(packageId, appName)) return true;
 
   if (packageId) {
     const lowerId = packageId.trim().toLowerCase();

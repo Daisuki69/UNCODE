@@ -106,6 +106,7 @@ export function Dashboard({
   const [isParsing, setIsParsing] = useState(false);
   const [ocrType, setOcrType] = useState<'simple' | 'formatted'>(settings.defaultOcrType || 'simple');
   const [isDecluttering, setIsDecluttering] = useState(false);
+  const [viewingHomeworkSchedule, setViewingHomeworkSchedule] = useState<ScheduleData | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -499,7 +500,7 @@ export function Dashboard({
             <button
               onClick={onOpenLogs}
               className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-indigo-50 text-indigo-500 transition-colors"
-              title="Homeworks Completed"
+              title="Homeworks Log"
             >
               <FileText className="w-5 h-5" />
             </button>
@@ -618,9 +619,21 @@ export function Dashboard({
                   </div>
                   
                   <div className="mb-4">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Homework Content</h4>
-                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 line-clamp-3">
-                      <p className="text-xs text-gray-600 font-mono whitespace-pre-wrap">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Homework Content</h4>
+                      <span 
+                        onClick={() => setViewingHomeworkSchedule(schedule)}
+                        className="text-[10px] text-indigo-500 font-semibold cursor-pointer hover:underline"
+                      >
+                        View Full
+                      </span>
+                    </div>
+                    <div 
+                      onClick={() => setViewingHomeworkSchedule(schedule)}
+                      className="bg-gray-50 hover:bg-gray-100 p-3 rounded-xl border border-gray-100 hover:border-indigo-200 cursor-pointer transition-all shadow-xs"
+                      title="Click to view full homework content"
+                    >
+                      <p className="text-xs text-gray-600 font-mono whitespace-pre-wrap line-clamp-3">
                         {schedule.homeworkContent}
                       </p>
                     </div>
@@ -945,6 +958,50 @@ export function Dashboard({
           </motion.div>
         )}
       </AnimatePresence>
+      {viewingHomeworkSchedule && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-lg">
+                    {viewingHomeworkSchedule.title || 'Homework Session'}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Full Homework Content (Read Only)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingHomeworkSchedule(null)}
+                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                <p className="font-mono text-sm text-gray-800 whitespace-pre-wrap leading-relaxed select-text">
+                  {viewingHomeworkSchedule.homeworkContent || 'No homework content provided.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-white border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setViewingHomeworkSchedule(null)}
+                className="px-6 py-2.5 bg-gray-900 hover:bg-black text-white font-bold text-sm rounded-xl transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

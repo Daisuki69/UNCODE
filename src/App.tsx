@@ -274,8 +274,12 @@ export default function App() {
         try {
           const status = await getLockStatus();
           if (status && status.isLockActive) {
-            if (status.lockEndTime > 0) setLockEndTime(status.lockEndTime);
-            if (status.activeScheduleId) setActiveScheduleId(status.activeScheduleId);
+            if (status.lockEndTime > 0) {
+              setLockEndTime(prev => (prev !== status.lockEndTime ? status.lockEndTime : prev));
+            }
+            if (status.activeScheduleId) {
+              setActiveScheduleId(prev => (prev !== status.activeScheduleId ? status.activeScheduleId : prev));
+            }
             setAppState(prev => (prev !== 'evaluating' && prev !== 'result' ? 'locked' : prev));
           } else {
             setAppState(prev => (prev === 'locked' ? 'dashboard' : prev));
@@ -386,15 +390,8 @@ export default function App() {
 
       if (!foundActive) {
         if (appState === 'locked') {
-          getLockStatus().then(st => {
-            if (!st || !st.isLockActive) {
-              endLockdown();
-              navigate('dashboard');
-            }
-          }).catch(() => {
-            endLockdown();
-            navigate('dashboard');
-          });
+          endLockdown();
+          navigate('dashboard');
         }
 
         if (nearestUpcomingTime !== null && nearestScheduleDate !== null) {
@@ -438,6 +435,22 @@ export default function App() {
   const handleTimeout = useCallback((skipped?: boolean) => {
     endLockdown(); // Always release native lock if timer runs out or is skipped
     notifyUser(skipped ? 'Lock skipped (Test mode)' : 'Lock duration expired. Device access restored.');
+    
+    // Add failed session to completedHomeworks log
+    const activeSchedule = (settings.schedules || []).find(s => s.id === activeScheduleId);
+    if (activeSchedule) {
+      setCompletedHomeworks(prev => [{
+        id: crypto.randomUUID(),
+        title: activeSchedule.title || 'Untitled Session',
+        homeworkContent: activeSchedule.homeworkContent || '',
+        rubricContent: activeSchedule.rubricContent || '',
+        transcribedText: '(No submission — timer expired)',
+        feedback: skipped ? 'Lock session was skipped in test mode.' : 'Session failed: Timer expired before homework was submitted and passed.',
+        passed: false,
+        timestamp: Date.now()
+      }, ...prev]);
+    }
+
     if (activeScheduleId) {
       setSettings(prev => ({
         ...prev,
@@ -447,7 +460,7 @@ export default function App() {
       }));
     }
     navigate('dashboard', 'backward');
-  }, [activeScheduleId]);
+  }, [activeScheduleId, settings.schedules]);
 
   const handleCompleteOnboarding = async (role: 'student' | 'teacher' | 'just a guy') => {
     let initialAllowed = (settings.allowedApps || []).filter(a => !isAppBlacklisted(a.id) && !isHiddenSystemExemptApp(a.id, a.name));
@@ -465,14 +478,18 @@ export default function App() {
   };
 
   const handleSaveSchedule = (schedule: ScheduleData) => {
+    const safeSchedule: ScheduleData = {
+      ...schedule,
+      durationMinutes: Math.min(90, Math.max(1, schedule.durationMinutes || 25))
+    };
     setSettings(prev => {
       const schedules = prev.schedules || [];
-      const isExisting = schedules.some(s => s.id === schedule.id);
+      const isExisting = schedules.some(s => s.id === safeSchedule.id);
       return {
         ...prev,
         schedules: isExisting 
-          ? schedules.map(s => s.id === schedule.id ? schedule : s)
-          : [...schedules, schedule]
+          ? schedules.map(s => s.id === safeSchedule.id ? safeSchedule : s)
+          : [...schedules, safeSchedule]
       };
     });
     navigate('dashboard', 'backward');
@@ -552,22 +569,31 @@ export default function App() {
         if (activeSchedule?.selectedResourceIds?.includes('ai-general-knowledge')) {
           const textToHarvest = activeSchedule.aiAnswer || transcribedText || data.transcribedText;
           if (textToHarvest) {
-            // Background call to declutter and save via dynamic import
+            const realResources = (activeSchedule.selectedResourceIds || []).filter(id => id !== 'ai-general-knowledge');
             import('./api/declutterResource').then(({ declutterResource }) => {
-              declutterResource({
-                title: 'AI Research: ' + (activeSchedule.title || 'Topic'),
-                content: textToHarvest,
-                apiKey: settings.apiKey || '',
-                apiModel: settings.apiModel || 'gemini-2.0-flash',
-                customPrompts: settings.prompts,
-              }).then(harvestData => {
-                const realResources = activeSchedule.selectedResourceIds!.filter(id => id !== 'ai-general-knowledge');
-                if (realResources.length > 0) {
-                  setResources(prev => prev.map(r => r.id === realResources[0] ? { ...r, content: r.content + '\n\n' + harvestData.content } : r));
-                } else {
+              if (realResources.length > 0) {
+                const targetRes = resources.find(r => r.id === realResources[0]);
+                const combinedContent = (targetRes ? targetRes.content + '\n\n' : '') + textToHarvest;
+                declutterResource({
+                  title: targetRes?.title || 'AI Research: ' + (activeSchedule.title || 'Topic'),
+                  content: combinedContent,
+                  apiKey: settings.apiKey || '',
+                  apiModel: settings.apiModel || 'gemini-2.0-flash',
+                  customPrompts: settings.prompts,
+                }).then(harvestData => {
+                  setResources(prev => prev.map(r => r.id === realResources[0] ? { ...r, content: harvestData.content } : r));
+                }).catch(console.error);
+              } else {
+                declutterResource({
+                  title: 'AI Research: ' + (activeSchedule.title || 'Topic'),
+                  content: textToHarvest,
+                  apiKey: settings.apiKey || '',
+                  apiModel: settings.apiModel || 'gemini-2.0-flash',
+                  customPrompts: settings.prompts,
+                }).then(harvestData => {
                   setResources(prev => [...prev, { id: crypto.randomUUID(), title: harvestData.title || 'AI Research', content: harvestData.content, createdAt: Date.now() }]);
-                }
-              }).catch(console.error);
+                }).catch(console.error);
+              }
             });
           }
         }
